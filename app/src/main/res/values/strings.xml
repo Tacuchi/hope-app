@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hope</string>
+
+    <!-- Comunes -->
+    <string name="action_back">Volver</string>
+    <string name="action_close">Cerrar</string>
+
+    <!-- Biblioteca -->
+    <string name="library_title">Hope</string>
+    <string name="library_search">Buscar en redes</string>
+    <string name="library_assets">Assets</string>
+    <string name="library_empty_title">Aún no tienes hopes</string>
+    <string name="library_empty_body">Comparte un video desde WhatsApp o TikTok a Hope, o empieza aquí con tu voz.</string>
+    <string name="library_new_hope">Nueva hope</string>
+    <string name="library_find_inspiration">Buscar inspiración</string>
+
+    <!-- Buscar en redes -->
+    <string name="search_title">Buscar en redes</string>
+    <string name="search_intro">Busca videos que te den ánimo. Se abre la búsqueda de “hopecore” en la red que elijas.</string>
+    <string name="search_term">hopecore</string>
+    <string name="search_tiktok">TikTok</string>
+    <string name="search_tiktok_hint">Buscar #hopecore</string>
+    <string name="search_youtube">YouTube</string>
+    <string name="search_youtube_hint">Buscar hopecore</string>
+    <string name="search_instagram">Instagram</string>
+    <string name="search_instagram_hint">Explorar #hopecore</string>
+    <string name="search_found_title">¿Encontraste uno?</string>
+    <string name="search_found_body">Guárdalo en la app de la red o ábrelo en WhatsApp, toca Compartir y elige Hope.</string>
+
+    <!-- Assets -->
+    <string name="assets_title">Assets</string>
+    <string name="assets_filter_all">Todos</string>
+    <string name="assets_filter_audio">Audio</string>
+    <string name="assets_filter_image">Imagen</string>
+    <string name="assets_empty_title">Aún no tienes assets</string>
+    <string name="assets_empty_body">Los audios y las imágenes que importes o extraigas de un video aparecen aquí.</string>
+    <string name="assets_import">Importar</string>
+
+    <!-- Nueva hope -->
+    <string name="editor_title">Nueva hope</string>
+    <string name="editor_cover">Portada</string>
+    <string name="editor_change_frame">Cambiar fotograma</string>
+    <string name="editor_field_title">Título</string>
+    <string name="editor_background_track">Pista de fondo</string>
+    <string name="editor_background_empty">Sin audio todavía</string>
+    <string name="editor_play">Reproducir</string>
+    <string name="editor_volume">Volumen</string>
+    <string name="editor_percent">%1$d %%</string>
+    <string name="editor_trim">Recorte</string>
+    <string name="editor_trim_start">Inicio %1$s</string>
+    <string name="editor_trim_end">Fin %1$s</string>
+    <string name="editor_voice_track">Pista de voz</string>
+    <string name="editor_voice_empty">Sin grabar todavía</string>
+    <string name="editor_record">Grabar voz</string>
+    <string name="editor_voice_offset">Entra a los</string>
+    <string name="editor_offset_less">Entrar antes</string>
+    <string name="editor_offset_more">Entrar después</string>
+    <string name="editor_link">Enlace de origen (opcional)</string>
+    <string name="editor_link_help">Se abre en su app. No se guarda el video.</string>
+    <string name="editor_listen">Escuchar</string>
+    <string name="editor_save">Guardar</string>
+    <string name="editor_zero_time">0:00</string>
+</resources>

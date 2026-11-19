@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Solo para recursos del sistema (pantalla de inicio e ícono). La UI usa HopeTheme. -->
+    <color name="hope_lime">#FFB6F23C</color>
+    <color name="hope_on_lime">#FF111111</color>
+    <color name="hope_window_background">#FFE6E6E2</color>
+</resources>

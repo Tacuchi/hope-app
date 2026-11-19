@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hope" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/hope_window_background</item>
+    </style>
+
+    <style name="Theme.Hope.Starting" parent="Theme.SplashScreen.IconBackground">
+        <item name="windowSplashScreenBackground">@color/hope_window_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/hope_lime</item>
+        <item name="postSplashScreenTheme">@style/Theme.Hope</item>
+    </style>
+</resources>
