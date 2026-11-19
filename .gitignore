@@ -1,0 +1,18 @@
+# Gradle y Android Studio
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Firmas y secretos
+*.jks
+*.keystore
+keystore.properties
+
+# macOS
+.DS_Store
