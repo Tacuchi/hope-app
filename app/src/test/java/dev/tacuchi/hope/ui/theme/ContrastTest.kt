@@ -4,6 +4,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import org.junit.Assert.assertTrue
+import dev.tacuchi.hope.data.Palette
 import org.junit.Test
 import kotlin.math.max
 import kotlin.math.min
@@ -16,10 +17,11 @@ import kotlin.math.pow
 class ContrastTest {
 
     @Test
-    fun darkSchemeMeetsAa() = assertPairs("oscuro", HopeDarkColors)
-
-    @Test
-    fun lightSchemeMeetsAa() = assertPairs("claro", HopeLightColors)
+    fun fixedSchemesMeetAa() {
+        for (palette in Palette.entries.filter { it != Palette.Dynamic }) {
+            for (dark in listOf(false, true)) assertPairs("$palette dark=$dark", fixedScheme(palette, dark))
+        }
+    }
 
     @Test
     fun formulaMatchesKnownValues() {

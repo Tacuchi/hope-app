@@ -22,7 +22,8 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 | kotlinx-serialization | 1.13.0 |
 | Room | 2.8.5 |
 | KSP | 2.3.14 |
-| Media3 (Transformer, ExoPlayer, Common) | 1.11.1 |
+| Media3 (Transformer, ExoPlayer, Common, Session) | 1.11.1 |
+| AboutLibraries (plugin Android y Compose M3) | 15.3.0 |
 | JUnit | 4.13.2 |
 | Robolectric | 4.18.1 |
 | AndroidX Test core / ext-junit / runner | 1.7.0 / 1.3.0 / 1.7.0 |
@@ -43,7 +44,7 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 - Datos (`data/`): Room guarda el catálogo de assets y las hopes; los archivos viven en `filesDir/assets/`. El nombre visible se arma con el tipo y el número (o el momento del fotograma), no se guarda. «Nota de voz» es solo para OGG u Opus; el resto de los audios importados es «Audio». El esquema se exporta a `app/schemas/`.
 - Hopes: guardan qué assets usan (portada, fondo, voz) y sus ajustes (volumen por pista, recorte del fondo, desfase de la voz). La mezcla no se graba: ocurre al reproducir. Las referencias a assets son claves foráneas `RESTRICT`: un asset en uso no se borra, y Assets muestra qué hopes lo usan. Borrar una hope no borra sus assets.
 - Migraciones: automáticas (`AutoMigration`) mientras solo sumen tablas o columnas, nunca destructivas. Cada versión nueva se prueba abriendo una base de la anterior con assets (`HopeRepositoryTest`).
-- Mezcla (`playback/MixPlayer`): un solo reproductor para el editor y la biblioteca, en el contenedor. Es un `CompositionPlayer` de Media3 con dos secuencias que se mezclan en una sola salida de audio: el fondo recortado y la voz detrás de un silencio del largo de su desfase. Por salir juntas no se desfasan (con dos ExoPlayer la voz llegaba con 230 a 320 ms de atraso). El volumen de cada pista es un `GainProcessor` que se ajusta en vivo. La duración de una hope va del inicio del recorte al final de la última pista. Solo suena con la app a la vista: `MainActivity.onStop` lo pausa.
+- Mezcla (`playback/MixPlayer`): un solo reproductor para el editor y la biblioteca, en el contenedor. Es un `CompositionPlayer` de Media3 con dos secuencias que se mezclan en una sola salida de audio: el fondo recortado y la voz detrás de un silencio del largo de su desfase. Por salir juntas no se desfasan (con dos ExoPlayer la voz llegaba con 230 a 320 ms de atraso). El volumen de cada pista es un `GainProcessor` que se ajusta en vivo. La duración de una hope va del inicio del recorte al final de la última pista. `PlaybackService` expone la mezcla a través de una sesión de Media3 para que siga sonando en segundo plano. La notificación ofrece pausa, posición y Cerrar. Perder el foco de audio o desconectar los audífonos pausa la reproducción.
 - Grabación (`recording/`): `MediaRecorder` en AAC dentro de M4A a `filesDir/recording-tmp/`. «Listo» crea el asset «Grabación N»; descartar borra el temporal. El permiso de micrófono se pide al tocar Grabar. Con audífonos (cable, USB, Bluetooth A2DP o LE, según `AudioManager.getDevices`) el fondo suena mientras se graba; por el altavoz se graba en silencio, con un aviso.
 - Importación (`importing/`): todo lo recibido se copia primero a `filesDir/import-tmp/<sesión>/`, se inspecciona por su contenido (no por la extensión) y solo al confirmar pasa a ser asset. Cancelar o fallar borra la sesión.
 - Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` y `MixPlayer`, con `@OptIn(UnstableApi::class)`.
@@ -54,8 +55,8 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 
 ## Tema y diseño
 
-- `ui/theme/Theme.kt` define `HopeTheme` con los esquemas claro y oscuro de la marca. Sin color dinámico.
-- El lima `#b6f23c` es relleno (`primaryContainer`) en los dos temas. En claro nunca va como texto: el acento de texto es `primary` `#4c6700`.
+- Ajustes permite elegir Sistema, Claro u Oscuro y las paletas Hope, Lima, Coral y Violeta. En Android 12 o superior también ofrece Dinámico. La app abre con Sistema y Hope y guarda la selección en `SharedPreferences`. AboutLibraries genera las licencias durante la compilación.
+- En la paleta Lima, `#b6f23c` es relleno (`primaryContainer`) en los dos temas. En claro nunca va como texto: el acento de texto es `primary` `#4c6700`.
 - Componentes, tipografía (Roboto) y formas de Material 3 por defecto. Lo único propio es la paleta.
 - Íconos: Material Symbols Outlined como vectores en `res/drawable/ic_*.xml`. Se usan con `painterResource`.
 - Lo que una fase todavía no implementa se ve deshabilitado, nunca roto.

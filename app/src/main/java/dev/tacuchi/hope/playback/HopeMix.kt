@@ -6,6 +6,7 @@ import java.io.File
 
 /** Cómo suena una hope guardada. El editor arma el mismo [MixSpec] con sus ajustes. */
 fun HopeWithAssets.toMixSpec(fileOf: (Asset) -> File): MixSpec = MixSpec(
+    presentation = MixPresentation(hope.title, cover?.let(fileOf)),
     background = background?.let(fileOf),
     backgroundLengthMs = background?.durationMs,
     backgroundVolume = hope.backgroundVolume,

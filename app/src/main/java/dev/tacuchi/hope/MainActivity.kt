@@ -8,11 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.luminance
 import androidx.core.content.IntentCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tacuchi.hope.importing.OriginResolver
 import dev.tacuchi.hope.links.Links
 import dev.tacuchi.hope.navigation.HopeNavigation
@@ -34,16 +39,18 @@ class MainActivity : ComponentActivity() {
         // Al recrear la actividad el intent es el mismo: solo se importa la primera vez.
         if (savedInstanceState == null) importShared(intent)
         setContent {
-            HopeTheme {
+            val appearance by appContainer.appearanceRepository.appearance.collectAsStateWithLifecycle()
+            HopeTheme(appearance) {
+                val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+                SideEffect {
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = lightBars
+                        isAppearanceLightNavigationBars = lightBars
+                    }
+                }
                 HopeNavigation(importViewModel, sharedLink, onSharedLinkConsumed = { sharedLink = null })
             }
         }
-    }
-
-    /** La hope solo suena con la app a la vista: salir o bloquear la pantalla la pausa. */
-    override fun onStop() {
-        super.onStop()
-        appContainer.mixPlayer.pause()
     }
 
     /** Hope ya estaba abierta (singleTask): lo compartido llega a la misma instancia. */

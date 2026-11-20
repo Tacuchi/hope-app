@@ -35,6 +35,7 @@ data class MixSpec(
     val voiceLengthMs: Long? = null,
     val voiceVolume: Int = 100,
     val voiceOffsetMs: Long = 0,
+    val presentation: MixPresentation = MixPresentation(),
 ) {
     val durationMs: Long
         get() = hopeDurationMs(
@@ -51,12 +52,15 @@ data class MixSpec(
 
     /** Lo mismo salvo los volúmenes: se puede cambiar el volumen sin cortar lo que suena. */
     fun sameTimeline(other: MixSpec): Boolean =
-        copy(backgroundVolume = 0, voiceVolume = 0) == other.copy(backgroundVolume = 0, voiceVolume = 0)
+        copy(backgroundVolume = other.backgroundVolume, voiceVolume = other.voiceVolume, presentation = other.presentation) == other
 }
+
+data class MixPresentation(val title: String = "", val cover: File? = null)
 
 /** Qué está sonando. [key] identifica quién lo pidió: una hope de la biblioteca o el editor. */
 data class MixPlayback(
     val key: String? = null,
+    val presentation: MixPresentation = MixPresentation(),
     val isPlaying: Boolean = false,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
@@ -91,11 +95,14 @@ private class LiveGain : GainProcessor.GainProvider {
 class MixPlayer internal constructor(
     private val context: Context,
     private val outputMeter: AudioProcessor?,
+    private val onPlaybackRequested: (() -> Unit)? = null,
 ) {
     constructor(context: Context) : this(context, null)
 
+    private val focus = PlaybackFocus(context, ::pause)
     private val handler = Handler(Looper.getMainLooper())
     private var player: CompositionPlayer? = null
+    internal val sessionSource: Player? get() = player
     private var spec: MixSpec? = null
     private val backgroundGain = LiveGain()
     private val voiceGain = LiveGain()
@@ -120,9 +127,14 @@ class MixPlayer internal constructor(
             if (isPlaying) handler.post(tick)
         }
 
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            if (_state.value.key != null) _state.value = _state.value.copy(positionMs = newPosition.positionMs)
+        }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState != Player.STATE_ENDED) return
             // Terminó la última pista: queda listo para volver a empezar.
+            focus.abandon()
             player?.pause()
             player?.seekTo(0)
             _state.value = _state.value.copy(isPlaying = false, positionMs = 0)
@@ -141,11 +153,12 @@ class MixPlayer internal constructor(
         val same = current.key == key && spec?.sameTimeline(mix) == true
         val resumeAt = startMs ?: if (same) current.positionMs else 0L
         applyVolumes(mix)
-        if (mix.durationMs <= 0) return
+        if (mix.durationMs <= 0 || !focus.acquire()) return
         val from = resumeAt.takeIf { it < mix.durationMs } ?: 0L
         if (!same) load(mix, from) else player?.seekTo(from)
         spec = mix
-        _state.value = MixPlayback(key, isPlaying = false, positionMs = from, durationMs = mix.durationMs)
+        _state.value = MixPlayback(key, mix.presentation, isPlaying = false, positionMs = from, durationMs = mix.durationMs)
+        onPlaybackRequested?.invoke()
         player?.play()
     }
 
@@ -160,19 +173,25 @@ class MixPlayer internal constructor(
         val old = spec ?: return
         applyVolumes(mix)
         spec = mix
+        _state.value = current.copy(presentation = mix.presentation)
         if (old.sameTimeline(mix)) return
         val position = current.positionMs.coerceIn(0, mix.durationMs)
-        _state.value = current.copy(positionMs = position, durationMs = mix.durationMs)
+        _state.value = _state.value.copy(positionMs = position, durationMs = mix.durationMs)
         if (mix.durationMs <= 0) {
-            pause()
+            stop(key)
             return
         }
-        val wasPlaying = current.isPlaying
+        val wasPlaying = player?.playWhenReady == true
         load(mix, position)
         if (wasPlaying) player?.play()
     }
 
+    internal fun resume() {
+        if (spec != null && focus.acquire()) player?.play()
+    }
+
     fun pause() {
+        focus.abandon()
         val current = player ?: return
         if (!current.playWhenReady) return
         current.pause()
@@ -182,13 +201,14 @@ class MixPlayer internal constructor(
     /** Detiene si suena [key], por ejemplo al cerrar el editor o borrar la hope. */
     fun stop(key: String) {
         if (_state.value.key != key) return
-        player?.pause()
-        spec = null
-        _state.value = MixPlayback()
+        player?.stop()
+        release()
     }
 
     fun release() {
+        focus.abandon()
         handler.removeCallbacks(tick)
+        player?.removeListener(listener)
         player?.release()
         player = null
         spec = null

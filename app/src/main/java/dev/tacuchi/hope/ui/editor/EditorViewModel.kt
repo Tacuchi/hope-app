@@ -24,6 +24,7 @@ import dev.tacuchi.hope.links.LinkPreviews
 import dev.tacuchi.hope.links.Links
 import dev.tacuchi.hope.playback.MixPlayback
 import dev.tacuchi.hope.playback.MixPlayer
+import dev.tacuchi.hope.playback.MixPresentation
 import dev.tacuchi.hope.playback.MixSpec
 import dev.tacuchi.hope.recording.AudioOutputs
 import dev.tacuchi.hope.recording.VoiceRecorder
@@ -403,6 +404,7 @@ class EditorViewModel(
     private fun EditorDraft.withBackground(asset: Asset) = copy(background = asset, trimStartMs = 0, trimEndMs = null)
 
     private fun EditorDraft.toMixSpec() = MixSpec(
+        presentation = MixPresentation(title, cover?.let(assets::fileOf)),
         background = background?.let(assets::fileOf),
         backgroundLengthMs = background?.durationMs,
         backgroundVolume = backgroundVolume,

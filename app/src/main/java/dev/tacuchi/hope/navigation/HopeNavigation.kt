@@ -27,10 +27,18 @@ import dev.tacuchi.hope.ui.importing.ImportState
 import dev.tacuchi.hope.ui.importing.ImportViewModel
 import dev.tacuchi.hope.ui.library.LibraryScreen
 import dev.tacuchi.hope.ui.search.SearchScreen
+import dev.tacuchi.hope.ui.settings.LicensesScreen
+import dev.tacuchi.hope.ui.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
 data object LibraryRoute : NavKey
+
+@Serializable
+data object SettingsRoute : NavKey
+
+@Serializable
+data object LicensesRoute : NavKey
 
 @Serializable
 data object SearchRoute : NavKey
@@ -117,11 +125,14 @@ fun HopeNavigation(
             entry<LibraryRoute> {
                 LibraryScreen(
                     onOpenSearch = dropUnlessResumed { backStack.add(SearchRoute) },
+                    onOpenSettings = dropUnlessResumed { backStack.add(SettingsRoute) },
                     onOpenAssets = dropUnlessResumed { backStack.add(AssetsRoute) },
                     onNewHope = dropUnlessResumed { backStack.add(EditorRoute()) },
                     onEditHope = { id -> backStack.add(EditorRoute(hopeId = id)) },
                 )
             }
+            entry<SettingsRoute> { SettingsScreen(dropUnlessResumed(block = goBack), dropUnlessResumed { backStack.add(LicensesRoute) }) }
+            entry<LicensesRoute> { LicensesScreen(dropUnlessResumed(block = goBack)) }
             entry<SearchRoute> { SearchScreen(onBack = dropUnlessResumed(block = goBack)) }
             entry<AssetsRoute> {
                 AssetsScreen(

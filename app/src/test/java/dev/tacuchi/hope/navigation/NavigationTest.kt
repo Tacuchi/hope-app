@@ -44,6 +44,14 @@ class NavigationTest {
     }
 
     @Test
+    @org.robolectric.annotation.Config(sdk = [30])
+    fun olderAndroidOffersOnlyFixedColors() {
+        compose.onNodeWithContentDescription(text(R.string.settings)).performClick()
+        compose.onNodeWithText(text(R.string.palette_violet)).assertExists()
+        compose.onNodeWithText(text(R.string.palette_dynamic)).assertDoesNotExist()
+    }
+
+    @Test
     fun opensWithEmptyLibrary() {
         assertOnLibrary()
         compose.onNodeWithText(text(R.string.library_new_hope)).assertExists()

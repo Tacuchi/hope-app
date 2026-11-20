@@ -1,24 +1,24 @@
 package dev.tacuchi.hope.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import dev.tacuchi.hope.data.Appearance
+import dev.tacuchi.hope.data.Palette
+import dev.tacuchi.hope.data.ThemeMode
 
 private val Lime = Color(0xFFB6F23C)
 private val Ink = Color(0xFF111111)
 
-/**
- * Paleta de la marca (design/stitch/notas.md del hub). Sin color dinámico: el fondo de pantalla
- * del teléfono no altera la app.
- *
- * El lima es el relleno de las acciones principales (`primaryContainer`) en los dos temas.
- * En claro el lima no alcanza contraste como texto, así que `primary` es el verde oscuro.
- */
-val HopeDarkColors: ColorScheme = darkColorScheme(
+private val LimeDark: ColorScheme = darkColorScheme(
     primary = Lime,
     onPrimary = Ink,
     primaryContainer = Lime,
@@ -46,7 +46,7 @@ val HopeDarkColors: ColorScheme = darkColorScheme(
     onError = Color(0xFF690005),
 )
 
-val HopeLightColors: ColorScheme = lightColorScheme(
+private val LimeLight: ColorScheme = lightColorScheme(
     primary = Color(0xFF4C6700),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Lime,
@@ -74,13 +74,39 @@ val HopeLightColors: ColorScheme = lightColorScheme(
     onError = Color(0xFFFFFFFF),
 )
 
-@Composable
-fun HopeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) HopeDarkColors else HopeLightColors,
-        content = content,
+private fun accentScheme(dark: Boolean, ink: Color, accent: Color, pale: Color, deep: Color): ColorScheme {
+    val base = if (dark) darkColorScheme() else lightColorScheme()
+    val primary = if (dark) accent else ink
+    val onPrimary = if (dark) deep else Color.White
+    val container = if (dark) ink else pale
+    val onContainer = if (dark) Color.White else deep
+    return base.copy(
+        primary = primary, onPrimary = onPrimary, primaryContainer = container, onPrimaryContainer = onContainer,
+        secondary = primary, onSecondary = onPrimary, secondaryContainer = container, onSecondaryContainer = onContainer,
+        tertiary = primary, onTertiary = onPrimary, tertiaryContainer = container, onTertiaryContainer = onContainer,
+        surfaceTint = primary, inversePrimary = if (dark) ink else accent,
     )
+}
+
+internal fun fixedScheme(palette: Palette, dark: Boolean): ColorScheme = when (palette) {
+    Palette.Lime -> if (dark) LimeDark else LimeLight
+    Palette.Hope -> accentScheme(dark, Color(0xFF18478C), Color(0xFF61F2E4), Color(0xFFEEFFFE), Color(0xFF091E3E))
+    Palette.Coral -> accentScheme(dark, Color(0xFF903A32), Color(0xFFFFB4A9), Color(0xFFFFDAD4), Color(0xFF3B0806))
+    Palette.Violet -> accentScheme(dark, Color(0xFF634096), Color(0xFFD8BAFF), Color(0xFFEEDCFF), Color(0xFF290846))
+    Palette.Dynamic -> error("Dynamic colors require the Android wallpaper")
+}
+
+@Composable
+fun HopeTheme(appearance: Appearance = Appearance(), content: @Composable () -> Unit) {
+    val dark = when (appearance.theme) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    val scheme = if (appearance.palette == Palette.Dynamic && Build.VERSION.SDK_INT >= 31) {
+        if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
+    } else {
+        fixedScheme(if (appearance.palette == Palette.Dynamic) Palette.Hope else appearance.palette, dark)
+    }
+    MaterialTheme(colorScheme = scheme, content = content)
 }

@@ -63,6 +63,7 @@ class LibraryScreenTest {
         compose.setContent {
             HopeTheme {
                 LibraryContent(
+                    onOpenSettings = {},
                     state = state,
                     onOpenSearch = {},
                     onOpenAssets = {},

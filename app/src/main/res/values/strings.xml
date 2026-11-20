@@ -191,4 +191,17 @@
     <string name="link_shared_without_url">Lo compartido no trae un enlace.</string>
     <string name="library_open_original">Abrir original</string>
     <string name="library_has_link">Tiene enlace de origen</string>
+    <string name="settings">Ajustes</string>
+    <string name="licenses">Licencias</string>
+    <string name="theme">Tema</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="palette">Color</string>
+    <string name="palette_dynamic">Dinámico</string>
+    <string name="palette_lime">Lima</string>
+    <string name="palette_coral">Coral</string>
+    <string name="palette_violet">Violeta</string>
+    <string name="about">Acerca de</string>
+    <string name="app_version">Versión %1$s</string>
 </resources>

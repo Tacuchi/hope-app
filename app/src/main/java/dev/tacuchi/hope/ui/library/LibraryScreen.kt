@@ -72,6 +72,7 @@ private val FabClearance = 88.dp
 @Composable
 fun LibraryScreen(
     onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenAssets: () -> Unit,
     onNewHope: () -> Unit,
     onEditHope: (Long) -> Unit,
@@ -82,6 +83,7 @@ fun LibraryScreen(
     LibraryContent(
         state = state,
         onOpenSearch = onOpenSearch,
+        onOpenSettings = onOpenSettings,
         onOpenAssets = onOpenAssets,
         onNewHope = onNewHope,
         onTogglePlay = viewModel::togglePlay,
@@ -96,6 +98,7 @@ fun LibraryScreen(
 fun LibraryContent(
     state: LibraryUiState,
     onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenAssets: () -> Unit,
     onNewHope: () -> Unit,
     onTogglePlay: (LibraryItem) -> Unit,
@@ -115,6 +118,9 @@ fun LibraryContent(
                             painterResource(R.drawable.ic_travel_explore),
                             contentDescription = stringResource(R.string.library_search),
                         )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.settings))
                     }
                     IconButton(onClick = onOpenAssets) {
                         Icon(
