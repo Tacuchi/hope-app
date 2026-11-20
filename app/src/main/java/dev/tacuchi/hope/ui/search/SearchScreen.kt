@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,26 +28,32 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.tacuchi.hope.R
+import dev.tacuchi.hope.links.LinkNetwork
+import dev.tacuchi.hope.links.Links
+import dev.tacuchi.hope.ui.common.openLink
 
 private data class Network(
     @StringRes val name: Int,
     @StringRes val hint: Int,
     @DrawableRes val icon: Int,
+    val searchUrl: String,
 )
 
 private val networks = listOf(
-    Network(R.string.search_tiktok, R.string.search_tiktok_hint, R.drawable.ic_smart_display),
-    Network(R.string.search_youtube, R.string.search_youtube_hint, R.drawable.ic_play_circle),
-    Network(R.string.search_instagram, R.string.search_instagram_hint, R.drawable.ic_photo_camera),
+    Network(R.string.search_tiktok, R.string.search_tiktok_hint, R.drawable.ic_smart_display, Links.searches.getValue(LinkNetwork.TikTok)),
+    Network(R.string.search_youtube, R.string.search_youtube_hint, R.drawable.ic_play_circle, Links.searches.getValue(LinkNetwork.YouTube)),
+    Network(R.string.search_instagram, R.string.search_instagram_hint, R.drawable.ic_photo_camera, Links.searches.getValue(LinkNetwork.Instagram)),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,29 +82,39 @@ fun SearchScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // Abrir la búsqueda llega en una fase posterior: el chip y las tarjetas se ven deshabilitados.
-            AssistChip(
-                onClick = {},
-                enabled = false,
-                label = { Text(stringResource(R.string.search_term)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-            )
-            networks.forEach { network -> NetworkCard(network) }
+            SearchTerm()
+            networks.forEach { network -> NetworkCard(network) { openLink(context, network.searchUrl) } }
             FoundOneCard()
         }
     }
 }
 
+/** El término fijo: se muestra como chip, pero no es un control. */
 @Composable
-private fun NetworkCard(network: Network) {
+private fun SearchTerm() {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_search),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.search_term), style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
+private fun NetworkCard(network: Network, onOpen: () -> Unit) {
     Card(
-        onClick = {},
-        enabled = false,
+        onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -107,15 +122,23 @@ private fun NetworkCard(network: Network) {
         ) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(network.icon), contentDescription = null)
+                    Icon(painterResource(network.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(network.name), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(network.hint), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(network.hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Icon(painterResource(R.drawable.ic_open_in_new), contentDescription = null)
+            Icon(
+                painterResource(R.drawable.ic_open_in_new),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

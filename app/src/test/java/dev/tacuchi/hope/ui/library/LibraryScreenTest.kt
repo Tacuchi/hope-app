@@ -2,6 +2,8 @@ package dev.tacuchi.hope.ui.library
 
 import android.content.Context
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -38,12 +40,12 @@ class LibraryScreenTest {
         fileName = "a.m4a", mimeType = "audio/mp4",
     )
 
-    private fun item(id: Long, title: String, trimEndMs: Long? = null) = LibraryItem(
+    private fun item(id: Long, title: String, trimEndMs: Long? = null, linkUrl: String? = null) = LibraryItem(
         HopeWithAssets(
             hope = Hope(
                 id = id, title = title, coverAssetId = null, backgroundAssetId = background.id, voiceAssetId = null,
                 backgroundVolume = 30, voiceVolume = 100, trimStartMs = 0, trimEndMs = trimEndMs, voiceOffsetMs = 0,
-                createdAt = id,
+                createdAt = id, linkUrl = linkUrl,
             ),
             cover = null,
             background = background,
@@ -55,6 +57,7 @@ class LibraryScreenTest {
     private var toggled: LibraryItem? = null
     private var edited: LibraryItem? = null
     private var deleted: LibraryItem? = null
+    private var opened: LibraryItem? = null
 
     private fun show(state: LibraryUiState) {
         compose.setContent {
@@ -67,6 +70,7 @@ class LibraryScreenTest {
                     onTogglePlay = { toggled = it },
                     onEdit = { edited = it },
                     onDelete = { deleted = it },
+                    onOpenOriginal = { opened = it },
                 )
             }
         }
@@ -119,5 +123,20 @@ class LibraryScreenTest {
 
         compose.onNodeWithText(text(R.string.library_empty_title)).assertExists()
         compose.onNodeWithText(text(R.string.library_new_hope)).assertExists()
+    }
+
+    @Test
+    fun onlyAHopeWithALinkShowsItAndOpensTheOriginal() {
+        val linked = item(2, "Antes de entrar", linkUrl = "https://youtu.be/jNQXAC9IVRw")
+        show(LibraryUiState(items = listOf(linked, item(1, "Respira"))))
+
+        compose.onAllNodesWithContentDescription(text(R.string.library_has_link)).assertCountEquals(1)
+        compose.onNodeWithContentDescription(text(R.string.library_more, "Respira")).performClick()
+        compose.onNodeWithText(text(R.string.library_open_original)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.library_edit)).performClick()
+
+        compose.onNodeWithContentDescription(text(R.string.library_more, "Antes de entrar")).performClick()
+        compose.onNodeWithText(text(R.string.library_open_original)).performClick()
+        assertEquals(linked, opened)
     }
 }

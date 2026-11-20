@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +65,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,7 +77,13 @@ import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetOrigin
 import dev.tacuchi.hope.data.AssetType
 import dev.tacuchi.hope.ui.assets.assetName
+import dev.tacuchi.hope.links.Link
+import dev.tacuchi.hope.links.LinkPreview
 import dev.tacuchi.hope.ui.common.AssetImage
+import dev.tacuchi.hope.ui.common.RemoteThumbnail
+import dev.tacuchi.hope.ui.common.icon
+import dev.tacuchi.hope.ui.common.label
+import dev.tacuchi.hope.ui.common.openLink
 import dev.tacuchi.hope.ui.common.formatDuration
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -136,6 +146,8 @@ fun EditorScreen(
         state = state,
         onClose = onClose,
         onTitleChange = viewModel::setTitle,
+        onLinkChange = viewModel::setLink,
+        onOpenLink = { url -> openLink(context, url) },
         onPickCover = { picking = EditorSlot.Cover },
         onPickBackground = { picking = EditorSlot.Background },
         onToggleBackground = viewModel::toggleBackgroundPreview,
@@ -197,6 +209,8 @@ fun EditorContent(
     state: EditorUiState,
     onClose: () -> Unit,
     onTitleChange: (String) -> Unit,
+    onLinkChange: (String) -> Unit,
+    onOpenLink: (String) -> Unit,
     onPickCover: () -> Unit,
     onPickBackground: () -> Unit,
     onToggleBackground: () -> Unit,
@@ -254,18 +268,72 @@ fun EditorContent(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-                // Los enlaces de origen llegan en una fase posterior: el campo se ve, deshabilitado.
-                OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
-                    enabled = false,
-                    label = { Text(stringResource(R.string.editor_link)) },
-                    leadingIcon = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
-                    supportingText = { Text(stringResource(R.string.editor_link_help)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                LinkField(draft, onLinkChange)
+                draft.link?.let { link -> LinkCard(link, draft.currentPreview) { onOpenLink(link.url) } }
+            }
+        }
+    }
+}
+
+/** Un texto que no es enlace se marca al escribirlo, y la hope no se guarda así. */
+@Composable
+private fun LinkField(draft: EditorDraft, onChange: (String) -> Unit) {
+    val invalid = draft.linkInvalid
+    OutlinedTextField(
+        value = draft.linkText,
+        onValueChange = onChange,
+        label = { Text(stringResource(R.string.editor_link)) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
+        isError = invalid,
+        supportingText = {
+            Text(stringResource(if (invalid) R.string.editor_link_invalid else R.string.editor_link_help))
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * La ficha del enlace: su red y, si la red dio vista previa, título y miniatura. Tocarla abre el
+ * original. La miniatura se lee de la red y no se guarda; sin conexión queda el ícono de la red.
+ */
+@Composable
+private fun LinkCard(link: Link, preview: LinkPreview?, onOpen: () -> Unit) {
+    val network = stringResource(link.network.label())
+    OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(width = 80.dp, height = 60.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(painterResource(link.network.icon()), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    preview?.thumbnailUrl?.let { RemoteThumbnail(it, Modifier.fillMaxSize()) }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    preview?.title ?: network,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (preview != null) network else link.url,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            Icon(
+                painterResource(R.drawable.ic_open_in_new),
+                contentDescription = stringResource(R.string.editor_link_open),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

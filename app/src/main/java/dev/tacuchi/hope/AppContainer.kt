@@ -7,6 +7,7 @@ import dev.tacuchi.hope.data.HopeRepository
 import dev.tacuchi.hope.importing.AudioExtractor
 import dev.tacuchi.hope.importing.ImportStaging
 import dev.tacuchi.hope.importing.MediaInspector
+import dev.tacuchi.hope.links.LinkPreviews
 import dev.tacuchi.hope.playback.MixPlayer
 import dev.tacuchi.hope.recording.AudioOutputs
 import dev.tacuchi.hope.recording.MediaRecorderCapture
@@ -41,4 +42,6 @@ class AppContainer(context: Context) {
     }
 
     val audioOutputs: AudioOutputs by lazy { AudioOutputs(appContext) }
+
+    val linkPreviews: LinkPreviews by lazy { LinkPreviews() }
 }

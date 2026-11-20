@@ -1,6 +1,6 @@
 # Hope · guía para agentes
 
-App Android para armar *hopes*: audio que da ánimo, una portada y la voz de la persona encima. Todo vive en el teléfono: sin login ni servidor.
+App Android para armar *hopes*: audio que da ánimo, una portada y la voz de la persona encima. Todo vive en el teléfono: sin login ni servidor. La red se usa solo para la vista previa de un enlace (ver «Enlaces»).
 
 Specs, planes y diseño viven en el hub `personal-lab/projects/hope-app`, no en este repo.
 
@@ -47,7 +47,9 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 - Grabación (`recording/`): `MediaRecorder` en AAC dentro de M4A a `filesDir/recording-tmp/`. «Listo» crea el asset «Grabación N»; descartar borra el temporal. El permiso de micrófono se pide al tocar Grabar. Con audífonos (cable, USB, Bluetooth A2DP o LE, según `AudioManager.getDevices`) el fondo suena mientras se graba; por el altavoz se graba en silencio, con un aviso.
 - Importación (`importing/`): todo lo recibido se copia primero a `filesDir/import-tmp/<sesión>/`, se inspecciona por su contenido (no por la extensión) y solo al confirmar pasa a ser asset. Cancelar o fallar borra la sesión.
 - Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` y `MixPlayer`, con `@OptIn(UnstableApi::class)`.
-- Compartir: `MainActivity` es `singleTask` y recibe `ACTION_SEND` de video, audio e imagen en `onCreate` y `onNewIntent`. El origen sale del referrer con una tabla de apps conocidas; si no, «Compartido».
+- Compartir: `MainActivity` es `singleTask` y recibe `ACTION_SEND` de video, audio, imagen y texto en `onCreate` y `onNewIntent`. El origen sale del referrer con una tabla de apps conocidas; si no, «Compartido». Un texto abre Nueva hope con su primer enlace puesto.
+- Enlaces (`links/`): una hope guarda un enlace a su video original (URL, red, título y URL de la miniatura). Es solo referencia: una hope sigue necesitando una pista, y nada del enlace se descarga ni entra a Assets. `Links.recognize` reconoce TikTok, YouTube (también `youtu.be` y Shorts) e Instagram (`/reel/` y `/p/`); cualquier otro `http(s)` es genérico. Buscar en redes abre `Links.searches` (*hopecore*) con `ACTION_VIEW`: la app de la red si está, si no el navegador.
+- Vista previa: solo YouTube, por oEmbed (`LinkPreviews`, `HttpURLConnection` sin caché). Se pide al recibir o pegar el enlace y al guardar, y se guarda con la hope: la biblioteca no consulta la red. La miniatura se dibuja desde la red solo en memoria (`RemoteThumbnail`). Sin conexión queda la ficha con la red. Es el único uso del permiso `INTERNET`.
 - Al terminar, una importación va adonde la pidieron (`ImportPurpose`): desde Assets, a Assets; compartida, a Nueva hope con el audio y la portada; desde el editor, de vuelta al editor. Cancelar en «Elegir portada» guarda igual el audio extraído.
 
 ## Tema y diseño
@@ -99,7 +101,11 @@ adb shell cmd uimode night yes                  # tema oscuro (no para claro)
 android emulator stop
 ```
 
-Compartir desde la terminal con `adb shell am start -a android.intent.action.SEND` no sirve: el shell no puede conceder permiso de lectura sobre un archivo de MediaStore. Se comparte desde la app Archivos del emulador (mantener pulsado, Compartir, Hope).
+Compartir un archivo desde la terminal con `adb shell am start -a android.intent.action.SEND` no sirve: el shell no puede conceder permiso de lectura sobre un archivo de MediaStore. Se comparte desde la app Archivos del emulador (mantener pulsado, Compartir, Hope). Un enlace sí se comparte desde la terminal:
+
+```sh
+adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "https://youtu.be/jNQXAC9IVRw" -n dev.tacuchi.hope/.MainActivity
+```
 
 ## Probar en el teléfono
 

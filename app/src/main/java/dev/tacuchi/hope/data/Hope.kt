@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.tacuchi.hope.links.LinkNetwork
 
 /**
  * Una hope guarda qué assets usa y cómo mezclarlos; la mezcla ocurre al reproducir. Las
@@ -33,6 +34,14 @@ data class Hope(
     /** Cuándo entra la voz, contado desde el inicio de la hope. */
     val voiceOffsetMs: Long,
     val createdAt: Long,
+    /**
+     * El enlace al video original: solo una referencia, nunca se descarga. El título y la URL de
+     * la miniatura vienen de la vista previa, cuando la red la da.
+     */
+    val linkUrl: String? = null,
+    val linkNetwork: LinkNetwork? = null,
+    val linkTitle: String? = null,
+    val linkThumbnailUrl: String? = null,
 )
 
 /** Una hope con sus assets resueltos, lista para mostrar o reproducir. */

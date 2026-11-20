@@ -165,6 +165,8 @@
     <string name="editor_offset_more">Entrar después</string>
     <string name="editor_link">Enlace de origen (opcional)</string>
     <string name="editor_link_help">Se abre en su app. No se guarda el video.</string>
+    <string name="editor_link_invalid">No es un enlace. Pega uno como https://youtu.be/…</string>
+    <string name="editor_link_open">Abrir original</string>
     <string name="editor_listen">Escuchar</string>
     <string name="editor_save">Guardar</string>
 
@@ -179,4 +181,14 @@
     <string name="recording_discard">Descartar</string>
     <string name="recording_done">Listo</string>
     <string name="recording_discard_hint">Si descartas, la toma no se guarda.</string>
+
+    <!-- Enlaces de origen -->
+    <string name="link_network_tiktok">TikTok</string>
+    <string name="link_network_youtube">YouTube</string>
+    <string name="link_network_instagram">Instagram</string>
+    <string name="link_network_generic">Enlace</string>
+    <string name="link_open_failed">No hay una app para abrir este enlace.</string>
+    <string name="link_shared_without_url">Lo compartido no trae un enlace.</string>
+    <string name="library_open_original">Abrir original</string>
+    <string name="library_has_link">Tiene enlace de origen</string>
 </resources>

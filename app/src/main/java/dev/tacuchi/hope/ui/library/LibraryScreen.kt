@@ -25,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.tacuchi.hope.ui.common.AssetImage
 import dev.tacuchi.hope.ui.common.formatDuration
+import dev.tacuchi.hope.ui.common.openLink
 
 /** Ancho máximo de la cuadrícula: en horizontal deja libre la esquina del botón «Nueva». */
 private val GridMaxWidth = 840.dp
@@ -76,6 +78,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     LibraryContent(
         state = state,
         onOpenSearch = onOpenSearch,
@@ -84,6 +87,7 @@ fun LibraryScreen(
         onTogglePlay = viewModel::togglePlay,
         onEdit = { onEditHope(it.id) },
         onDelete = viewModel::delete,
+        onOpenOriginal = { item -> item.linkUrl?.let { openLink(context, it) } },
     )
 }
 
@@ -97,6 +101,7 @@ fun LibraryContent(
     onTogglePlay: (LibraryItem) -> Unit,
     onEdit: (LibraryItem) -> Unit,
     onDelete: (LibraryItem) -> Unit,
+    onOpenOriginal: (LibraryItem) -> Unit,
 ) {
     var toDelete by remember { mutableStateOf<LibraryItem?>(null) }
     val items = state.items
@@ -139,7 +144,7 @@ fun LibraryContent(
             when {
                 items == null -> Unit
                 items.isEmpty() -> EmptyLibrary(onNewHope, onOpenSearch)
-                else -> HopeGrid(items, state.playingId, onTogglePlay, onEdit, onAskDelete = { toDelete = it })
+                else -> HopeGrid(items, state.playingId, onTogglePlay, onEdit, onOpenOriginal, onAskDelete = { toDelete = it })
             }
         }
     }
@@ -168,6 +173,7 @@ private fun HopeGrid(
     playingId: Long?,
     onTogglePlay: (LibraryItem) -> Unit,
     onEdit: (LibraryItem) -> Unit,
+    onOpenOriginal: (LibraryItem) -> Unit,
     onAskDelete: (LibraryItem) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -197,6 +203,7 @@ private fun HopeGrid(
                 playing = item.id == playingId,
                 onTogglePlay = { onTogglePlay(item) },
                 onEdit = { onEdit(item) },
+                onOpenOriginal = { onOpenOriginal(item) },
                 onDelete = { onAskDelete(item) },
             )
         }
@@ -209,6 +216,7 @@ private fun HopeCard(
     playing: Boolean,
     onTogglePlay: () -> Unit,
     onEdit: () -> Unit,
+    onOpenOriginal: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -257,15 +265,24 @@ private fun HopeCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (playing) colors.primary else colors.onSurfaceVariant,
                     )
+                    if (item.linkUrl != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            painterResource(R.drawable.ic_link),
+                            contentDescription = stringResource(R.string.library_has_link),
+                            tint = colors.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
-            HopeMenu(item.title, onEdit, onDelete)
+            HopeMenu(item.title, hasLink = item.linkUrl != null, onEdit, onOpenOriginal, onDelete)
         }
     }
 }
 
 @Composable
-private fun HopeMenu(title: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun HopeMenu(title: String, hasLink: Boolean, onEdit: () -> Unit, onOpenOriginal: () -> Unit, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -280,6 +297,16 @@ private fun HopeMenu(title: String, onEdit: () -> Unit, onDelete: () -> Unit) {
                     onEdit()
                 },
             )
+            if (hasLink) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.library_open_original)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_open_in_new), contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onOpenOriginal()
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.library_delete), color = MaterialTheme.colorScheme.error) },
                 leadingIcon = {

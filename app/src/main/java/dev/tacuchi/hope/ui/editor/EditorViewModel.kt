@@ -18,6 +18,10 @@ import dev.tacuchi.hope.data.Hope
 import dev.tacuchi.hope.data.HopeRepository
 import dev.tacuchi.hope.data.NewAsset
 import dev.tacuchi.hope.importing.MediaInspector
+import dev.tacuchi.hope.links.Link
+import dev.tacuchi.hope.links.LinkPreview
+import dev.tacuchi.hope.links.LinkPreviews
+import dev.tacuchi.hope.links.Links
 import dev.tacuchi.hope.playback.MixPlayback
 import dev.tacuchi.hope.playback.MixPlayer
 import dev.tacuchi.hope.playback.MixSpec
@@ -38,11 +42,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Con qué abre el editor: una hope guardada, o assets que ya vienen puestos. */
+/** Con qué abre el editor: una hope guardada, o assets y un enlace que ya vienen puestos. */
 data class EditorArgs(
     val hopeId: Long? = null,
     val coverAssetId: Long? = null,
     val backgroundAssetId: Long? = null,
+    val linkUrl: String? = null,
 )
 
 /** Un asset de la hoja de elegir, con su archivo para la miniatura. */
@@ -73,10 +78,19 @@ data class EditorDraft(
     val trimStartMs: Long = 0,
     val trimEndMs: Long? = null,
     val voiceOffsetMs: Long = 0,
+    /** Lo escrito en «Enlace de origen»; vacío es sin enlace. */
+    val linkText: String = "",
+    val linkPreview: LinkPreview? = null,
 ) {
+    /** El enlace reconocido, o nulo si el campo está vacío o no es un enlace. */
+    val link: Link? get() = Links.recognize(linkText)
+    val linkInvalid: Boolean get() = linkText.isNotBlank() && link == null
+
+    /** La vista previa solo vale para el enlace que se ve ahora. */
+    val currentPreview: LinkPreview? get() = linkPreview?.takeIf { it.url == link?.url }
     val titleMissing: Boolean get() = title.isBlank()
     val tracksMissing: Boolean get() = background == null && voice == null
-    val canSave: Boolean get() = !titleMissing && !tracksMissing
+    val canSave: Boolean get() = !titleMissing && !tracksMissing && !linkInvalid
 }
 
 data class EditorUiState(
@@ -109,10 +123,13 @@ class EditorViewModel(
     private val recorder: VoiceRecorder,
     private val inspector: MediaInspector,
     private val headphonesConnected: () -> Boolean,
+    private val previews: LinkPreviews,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
     private var createdAt = 0L
+    private var previewJob: Job? = null
+    private var saving = false
     private var recordingJob: Job? = null
     private var pendingTake: File? = null
 
@@ -145,16 +162,45 @@ class EditorViewModel(
                 trimStartMs = saved.hope.trimStartMs,
                 trimEndMs = saved.hope.trimEndMs,
                 voiceOffsetMs = saved.hope.voiceOffsetMs,
+                linkText = saved.hope.linkUrl.orEmpty(),
+                linkPreview = saved.hope.linkUrl?.let { url ->
+                    saved.hope.linkTitle?.let { title -> LinkPreview(url, title, saved.hope.linkThumbnailUrl) }
+                },
             )
         } else {
             EditorDraft()
         }
         args.coverAssetId?.let { id -> assets.get(id)?.let { draft = draft.copy(cover = it) } }
         args.backgroundAssetId?.let { id -> assets.get(id)?.let { draft = draft.withBackground(it) } }
+        args.linkUrl?.let { draft = draft.copy(linkText = it) }
         _state.update { it.copy(loading = false, isNew = saved == null, draft = draft, coverFile = draft.cover?.let(assets::fileOf)) }
+        requestPreview()
     }
 
     fun setTitle(title: String) = edit { it.copy(title = title) }
+
+    fun setLink(text: String) {
+        edit { it.copy(linkText = text) }
+        requestPreview(debounceMs = PREVIEW_DEBOUNCE_MS)
+    }
+
+    /**
+     * Pide la vista previa del enlace de ahora, una sola vez: se guarda con la hope y la
+     * biblioteca no vuelve a consultar la red. Sin respuesta queda la ficha con la red.
+     */
+    private fun requestPreview(debounceMs: Long = 0) {
+        previewJob?.cancel()
+        val draft = _state.value.draft
+        val link = draft.link ?: return
+        if (draft.currentPreview != null) return
+        previewJob = viewModelScope.launch {
+            delay(debounceMs)
+            val preview = previews.of(link) ?: return@launch
+            _state.update { state ->
+                if (state.draft.link?.url == preview.url) state.copy(draft = state.draft.copy(linkPreview = preview)) else state
+            }
+        }
+    }
 
     fun choose(slot: EditorSlot, asset: Asset) = edit { draft ->
         when (slot) {
@@ -296,7 +342,14 @@ class EditorViewModel(
             _state.update { it.copy(showErrors = true) }
             return
         }
+        // Pedir la vista previa abre una ventana: un segundo toque no crea otra hope.
+        if (saving) return
+        saving = true
         viewModelScope.launch {
+            // Sin vista previa todavía, se pide ahora; si no llega, la hope se guarda con la ficha.
+            previewJob?.cancel()
+            val link = draft.link
+            val preview = draft.currentPreview ?: link?.let { previews.of(it) }
             hopes.save(
                 Hope(
                     id = args.hopeId ?: 0,
@@ -310,6 +363,10 @@ class EditorViewModel(
                     trimEndMs = draft.trimEndMs,
                     voiceOffsetMs = draft.voiceOffsetMs,
                     createdAt = createdAt,
+                    linkUrl = link?.url,
+                    linkNetwork = link?.network,
+                    linkTitle = preview?.title,
+                    linkThumbnailUrl = preview?.thumbnailUrl,
                 ),
             )
             stopEditorPlayback()
@@ -371,6 +428,9 @@ class EditorViewModel(
         private const val RECORDING_KEY = "editor-recording"
         private const val TIMER_TICK_MS = 200L
 
+        /** Mientras se escribe el enlace no se consulta la red a cada letra. */
+        private const val PREVIEW_DEBOUNCE_MS = 600L
+
         /** Paso de «Entra a los». */
         const val OFFSET_STEP_MS = 1_000L
         private const val MAX_OFFSET_MS = 10 * 60 * 1000L
@@ -386,6 +446,7 @@ class EditorViewModel(
                     recorder = container.voiceRecorder,
                     inspector = container.inspector,
                     headphonesConnected = container.audioOutputs::headphonesConnected,
+                    previews = container.linkPreviews,
                 )
             }
         }

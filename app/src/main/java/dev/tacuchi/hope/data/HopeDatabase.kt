@@ -41,12 +41,16 @@ class SeparateVoiceNotes : AutoMigrationSpec {
 
 /**
  * Versión 2 suma la tabla de hopes y separa «Nota de voz» de «Audio» (ver [SeparateVoiceNotes]).
+ * Versión 3 suma a las hopes el enlace de origen: columnas nuevas y vacías, nada se toca.
  * Nunca hay migración destructiva: si una falla, la app no abre en lugar de borrar los assets.
  */
 @Database(
     entities = [Asset::class, Hope::class],
-    version = 2,
-    autoMigrations = [AutoMigration(from = 1, to = 2, spec = SeparateVoiceNotes::class)],
+    version = 3,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2, spec = SeparateVoiceNotes::class),
+        AutoMigration(from = 2, to = 3),
+    ],
 )
 abstract class HopeDatabase : RoomDatabase() {
     abstract fun assetDao(): AssetDao

@@ -38,12 +38,13 @@ data object SearchRoute : NavKey
 @Serializable
 data object AssetsRoute : NavKey
 
-/** El editor: una hope guardada ([hopeId]) o una nueva, con assets que pueden venir puestos. */
+/** El editor: una hope guardada ([hopeId]) o una nueva, con assets o un enlace que pueden venir puestos. */
 @Serializable
 data class EditorRoute(
     val hopeId: Long? = null,
     val coverAssetId: Long? = null,
     val backgroundAssetId: Long? = null,
+    val linkUrl: String? = null,
 ) : NavKey
 
 /** Una importación en curso; la muestra el estado de [ImportViewModel], no la pila. */
@@ -66,8 +67,20 @@ private fun EditorSlot.purpose() = when (this) {
  * destino tiene sus propios ViewModels, que se limpian al salir de la pila.
  */
 @Composable
-fun HopeNavigation(importViewModel: ImportViewModel) {
+fun HopeNavigation(
+    importViewModel: ImportViewModel,
+    sharedLink: String? = null,
+    onSharedLinkConsumed: () -> Unit = {},
+) {
     val backStack = rememberNavBackStack(LibraryRoute)
+
+    // Un enlace compartido abre Nueva hope con el enlace puesto.
+    LaunchedEffect(sharedLink) {
+        if (sharedLink != null) {
+            backStack.add(EditorRoute(linkUrl = sharedLink))
+            onSharedLinkConsumed()
+        }
+    }
     val goBack: () -> Unit = { backStack.removeLastOrNull() }
     val importState by importViewModel.state.collectAsStateWithLifecycle()
     var editorImport by remember { mutableStateOf<EditorImport?>(null) }
@@ -120,7 +133,7 @@ fun HopeNavigation(importViewModel: ImportViewModel) {
             }
             entry<EditorRoute> { route ->
                 EditorScreen(
-                    args = EditorArgs(route.hopeId, route.coverAssetId, route.backgroundAssetId),
+                    args = EditorArgs(route.hopeId, route.coverAssetId, route.backgroundAssetId, route.linkUrl),
                     imported = editorImport,
                     onImportedConsumed = { editorImport = null },
                     onImport = { uri, origin, slot ->

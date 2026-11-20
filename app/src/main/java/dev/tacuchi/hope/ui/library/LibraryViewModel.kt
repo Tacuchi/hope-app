@@ -26,6 +26,7 @@ data class LibraryItem(val hope: HopeWithAssets, val coverFile: File?) {
     val id: Long get() = hope.hope.id
     val title: String get() = hope.hope.title
     val durationMs: Long get() = hope.durationMs
+    val linkUrl: String? get() = hope.hope.linkUrl
 }
 
 data class LibraryUiState(

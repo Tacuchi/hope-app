@@ -3,6 +3,8 @@
 
     <!-- Grabar la voz en el editor. Se pide en el momento de grabar, nunca al abrir. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Solo para la vista previa de un enlace (título y miniatura de YouTube). Nada se descarga a disco. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".HopeApplication"
@@ -20,13 +22,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Compartir desde otra app: videos, audios e imágenes. -->
+            <!-- Compartir desde otra app: videos, audios, imágenes y textos con un enlace. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="video/*" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="image/*" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
     </application>

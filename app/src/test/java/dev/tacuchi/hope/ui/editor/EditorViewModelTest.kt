@@ -14,6 +14,8 @@ import dev.tacuchi.hope.data.HopeDatabase
 import dev.tacuchi.hope.data.HopeRepository
 import dev.tacuchi.hope.data.NewAsset
 import dev.tacuchi.hope.importing.MediaInspector
+import dev.tacuchi.hope.links.LinkNetwork
+import dev.tacuchi.hope.links.LinkPreviews
 import dev.tacuchi.hope.playback.MixPlayer
 import dev.tacuchi.hope.recording.AudioCapture
 import dev.tacuchi.hope.recording.VoiceRecorder
@@ -35,6 +37,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import java.io.File
+import java.io.IOException
 
 /** Graba bytes de mentira: el micrófono no existe en las pruebas. */
 private class FakeCapture : AudioCapture {
@@ -63,6 +66,9 @@ class EditorViewModelTest {
     private val collectors = mutableListOf<Job>()
     private var clock = 1_000L
 
+    /** Sin red por defecto: la vista previa falla como sin conexión. */
+    private var previews = LinkPreviews { throw IOException("sin red") }
+
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HopeDatabase::class.java)
@@ -86,6 +92,7 @@ class EditorViewModelTest {
         recorder = VoiceRecorder(FakeCapture(), recordingDir),
         inspector = MediaInspector(),
         headphonesConnected = { headphones },
+        previews = previews,
     ).also { vm ->
         collectors += CoroutineScope(Dispatchers.Main.immediate).launch { vm.state.collect {} }
         waitUntil { !vm.now.loading }
@@ -273,5 +280,62 @@ class EditorViewModelTest {
         vm.applyImported(EditorSlot.Cover, listOf(otherAudio, otherFrame))
         assertEquals(otherFrame, vm.now.draft.cover)
         assertEquals(audio, vm.now.draft.background)
+    }
+
+    @Test
+    fun aSharedYouTubeLinkIsSavedWithItsNetworkTitleAndThumbnail() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        previews = LinkPreviews { """{"title":"Me at the zoo","thumbnail_url":"https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg"}""" }
+        val vm = viewModel(EditorArgs(backgroundAssetId = background.id, linkUrl = "https://youtu.be/jNQXAC9IVRw"))
+
+        assertEquals(LinkNetwork.YouTube, vm.now.draft.link?.network)
+        waitUntil { vm.state.value.draft.currentPreview != null }
+        vm.setTitle("Antes de entrar")
+        vm.save()
+        waitUntil { vm.state.value.saved }
+
+        val saved = savedHopes().single().hope
+        assertEquals("https://youtu.be/jNQXAC9IVRw", saved.linkUrl)
+        assertEquals(LinkNetwork.YouTube, saved.linkNetwork)
+        assertEquals("Me at the zoo", saved.linkTitle)
+        assertEquals("https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg", saved.linkThumbnailUrl)
+    }
+
+    @Test
+    fun withoutConnectionTheLinkIsSavedWithItsNetworkOnly() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val vm = viewModel(EditorArgs(backgroundAssetId = background.id))
+
+        vm.setTitle("Respira")
+        vm.setLink("https://youtu.be/jNQXAC9IVRw")
+        vm.save()
+        waitUntil { vm.state.value.saved }
+
+        val saved = savedHopes().single().hope
+        assertEquals("https://youtu.be/jNQXAC9IVRw", saved.linkUrl)
+        assertEquals(LinkNetwork.YouTube, saved.linkNetwork)
+        assertNull(saved.linkTitle)
+        assertNull(saved.linkThumbnailUrl)
+    }
+
+    @Test
+    fun textThatIsNotALinkIsFlaggedAndKeepsTheHopeFromSaving() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val vm = viewModel(EditorArgs(backgroundAssetId = background.id))
+        vm.setTitle("Respira")
+
+        vm.setLink("mira este video")
+        assertTrue(vm.now.draft.linkInvalid)
+        vm.save()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(savedHopes().isEmpty())
+
+        // Un enlace de otro sitio se acepta como genérico; vaciar el campo también deja guardar.
+        vm.setLink("https://vimeo.com/76979871")
+        assertEquals(LinkNetwork.Generic, vm.now.draft.link?.network)
+        vm.setLink("")
+        vm.save()
+        waitUntil { vm.state.value.saved }
+        assertNull(savedHopes().single().hope.linkUrl)
     }
 }

@@ -4,11 +4,13 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tacuchi.hope.links.LinkNetwork
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -200,5 +202,69 @@ class HopeRepositoryTest {
         )
         val id = migratedHopes.save(hope("Después de migrar", background = kept.last()))
         assertNotNull(migratedHopes.get(id))
+    }
+
+    /** Una base de la versión 2 (assets y hopes) abre con todo intacto y las hopes sin enlace. */
+    @Test
+    fun migrationFromTheSecondVersionKeepsHopesAndAssets() = runBlocking {
+        database.close()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = context.getDatabasePath("migracion-2.db").apply { parentFile?.mkdirs(); delete() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            // Tablas tal como las exporta app/schemas/…/2.json.
+            old.execSQL(
+                "CREATE TABLE IF NOT EXISTS `assets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, " +
+                    "`nameKind` TEXT NOT NULL, `number` INTEGER, `frameMs` INTEGER, `origin` TEXT NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, `durationMs` INTEGER, `fileName` TEXT NOT NULL, `mimeType` TEXT NOT NULL)",
+            )
+            old.execSQL("CREATE INDEX IF NOT EXISTS `index_assets_type_createdAt` ON `assets` (`type`, `createdAt`)")
+            old.execSQL(
+                "CREATE TABLE IF NOT EXISTS `hopes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                    "`coverAssetId` INTEGER, `backgroundAssetId` INTEGER, `voiceAssetId` INTEGER, `backgroundVolume` INTEGER NOT NULL, " +
+                    "`voiceVolume` INTEGER NOT NULL, `trimStartMs` INTEGER NOT NULL, `trimEndMs` INTEGER, `voiceOffsetMs` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, " +
+                    "FOREIGN KEY(`coverAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , " +
+                    "FOREIGN KEY(`backgroundAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , " +
+                    "FOREIGN KEY(`voiceAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+            )
+            listOf("coverAssetId", "backgroundAssetId", "voiceAssetId", "createdAt").forEach { column ->
+                old.execSQL("CREATE INDEX IF NOT EXISTS `index_hopes_$column` ON `hopes` (`$column`)")
+            }
+            old.execSQL(
+                "INSERT INTO assets (type, nameKind, number, frameMs, origin, createdAt, durationMs, fileName, mimeType) " +
+                    "VALUES ('Audio', 'AudioFromVideo', 1, NULL, 'TikTok', 10, 52000, 'a.m4a', 'audio/mp4')",
+            )
+            old.execSQL(
+                "INSERT INTO assets (type, nameKind, number, frameMs, origin, createdAt, durationMs, fileName, mimeType) " +
+                    "VALUES ('Image', 'Frame', NULL, 14000, 'TikTok', 20, NULL, 'f.jpg', 'image/jpeg')",
+            )
+            old.execSQL(
+                "INSERT INTO hopes (title, coverAssetId, backgroundAssetId, voiceAssetId, backgroundVolume, voiceVolume, " +
+                    "trimStartMs, trimEndMs, voiceOffsetMs, createdAt) VALUES ('Respira', 2, 1, NULL, 30, 100, 4000, 48000, 2000, 30)",
+            )
+            old.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+            old.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '57e15652fb416a521b2366d28b979849')")
+            old.version = 2
+        }
+
+        database = HopeDatabase.create(context, "migracion-2.db")
+        val migratedAssets = AssetRepository(database, assetsDir)
+        val migratedHopes = HopeRepository(database)
+
+        assertEquals(listOf("f.jpg", "a.m4a"), migratedAssets.observe(null).first().map { it.fileName })
+        val kept = migratedHopes.observe().first().single()
+        assertEquals("Respira", kept.hope.title)
+        assertEquals("f.jpg", kept.cover?.fileName)
+        assertEquals("a.m4a", kept.background?.fileName)
+        assertEquals(30, kept.hope.backgroundVolume)
+        assertEquals(4_000L to 48_000L, kept.hope.trimStartMs to kept.hope.trimEndMs)
+        assertEquals(2_000L, kept.hope.voiceOffsetMs)
+        assertNull(kept.hope.linkUrl)
+
+        // La hope migrada acepta un enlace y lo devuelve con su red.
+        migratedHopes.save(kept.hope.copy(linkUrl = "https://youtu.be/jNQXAC9IVRw", linkNetwork = LinkNetwork.YouTube, linkTitle = "Me at the zoo"))
+        val linked = migratedHopes.get(kept.hope.id)!!.hope
+        assertEquals(LinkNetwork.YouTube, linked.linkNetwork)
+        assertEquals("Me at the zoo", linked.linkTitle)
     }
 }
