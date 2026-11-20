@@ -1,8 +1,14 @@
 package dev.tacuchi.hope.ui.assets
 
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,45 +17,98 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.tacuchi.hope.R
+import dev.tacuchi.hope.data.Asset
+import dev.tacuchi.hope.data.AssetOrigin
+import dev.tacuchi.hope.data.AssetType
 
-private enum class AssetFilter(@StringRes val label: Int, @DrawableRes val icon: Int) {
-    All(R.string.assets_filter_all, R.drawable.ic_check),
-    Audio(R.string.assets_filter_audio, R.drawable.ic_graphic_eq),
-    Image(R.string.assets_filter_image, R.drawable.ic_image),
+/** Ancho máximo del contenido: en horizontal deja libre la esquina del botón «Importar». */
+private val ContentMaxWidth = 600.dp
+
+/** Alto de la franja del botón «Importar»: el botón (56) más sus márgenes. */
+private val FabClearance = 88.dp
+
+/** Margen lateral que necesita el botón «Importar» para quedar al costado de la lista. */
+private val FabSideSpace = 176.dp
+
+@Composable
+fun AssetsScreen(
+    onBack: () -> Unit,
+    onImport: (uri: Uri, origin: AssetOrigin) -> Unit,
+    viewModel: AssetsViewModel = viewModel(factory = AssetsViewModel.Factory),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val pickVisual = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onImport(uri, AssetOrigin.Gallery)
+    }
+    val pickAudio = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onImport(uri, AssetOrigin.Files)
+    }
+    AssetsContent(
+        state = state,
+        onBack = onBack,
+        onSelectFilter = viewModel::selectFilter,
+        onTogglePlay = viewModel::togglePlay,
+        onDelete = viewModel::delete,
+        onImportVisual = {
+            pickVisual.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+        },
+        onImportAudio = { pickAudio.launch(arrayOf("audio/*")) },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssetsScreen(onBack: () -> Unit) {
-    var filter by rememberSaveable { mutableStateOf(AssetFilter.All) }
+fun AssetsContent(
+    state: AssetsUiState,
+    onBack: () -> Unit,
+    onSelectFilter: (AssetFilter) -> Unit,
+    onTogglePlay: (Asset) -> Unit,
+    onDelete: (Asset) -> Unit,
+    onImportVisual: () -> Unit,
+    onImportAudio: () -> Unit,
+) {
+    var toDelete by remember { mutableStateOf<Asset?>(null) }
 
     Scaffold(
         topBar = {
@@ -65,43 +124,140 @@ fun AssetsScreen(onBack: () -> Unit) {
                 },
             )
         },
-        floatingActionButton = { DisabledImportButton() },
+        floatingActionButton = { ImportButton(onImportVisual, onImportAudio) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AssetFilter.entries.forEach { option ->
-                    val selected = option == filter
-                    FilterChip(
-                        selected = selected,
-                        onClick = { filter = option },
-                        label = { Text(stringResource(option.label)) },
-                        leadingIcon = {
-                            val icon = if (selected) R.drawable.ic_check else option.icon
-                            Icon(painterResource(icon), contentDescription = null, Modifier.size(18.dp))
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            iconColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        border = null,
+            FilterRow(state.filter, onSelectFilter)
+            val assets = state.assets
+            when {
+                assets == null -> Unit
+                assets.isEmpty() -> EmptyState(filtered = state.filter != AssetFilter.All)
+                else -> BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    // Con margen lateral libre (horizontal) el botón queda al costado de la lista. Si no
+                    // (vertical), la lista termina sobre la franja del botón para que nunca tape una fila.
+                    val sideSpace = (maxWidth - ContentMaxWidth) / 2
+                    val fabHasItsOwnColumn = sideSpace >= FabSideSpace
+                    AssetList(
+                        assets = assets,
+                        playingId = state.playingId,
+                        onTogglePlay = onTogglePlay,
+                        onAskDelete = { toDelete = it },
+                        modifier = Modifier
+                            .widthIn(max = ContentMaxWidth)
+                            .fillMaxSize()
+                            .padding(bottom = if (fabHasItsOwnColumn) 0.dp else FabClearance),
                     )
                 }
             }
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
+        }
+    }
+
+    toDelete?.let { asset ->
+        val name = assetName(asset)
+        AlertDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text(stringResource(R.string.assets_delete_title, name)) },
+            text = { Text(stringResource(R.string.assets_delete_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    toDelete = null
+                    onDelete(asset)
+                }) { Text(stringResource(R.string.assets_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun AssetList(
+    assets: List<Asset>,
+    playingId: Long?,
+    onTogglePlay: (Asset) -> Unit,
+    onAskDelete: (Asset) -> Unit,
+    modifier: Modifier,
+) {
+    val listState = rememberLazyListState()
+    // Un asset nuevo entra arriba: la lista vuelve al inicio para mostrarlo.
+    // Solo cuando cambia de verdad: girar la pantalla conserva la posición.
+    val newestId = assets.firstOrNull()?.id
+    var shownNewestId by rememberSaveable { mutableStateOf(newestId) }
+    LaunchedEffect(newestId) {
+        if (newestId != shownNewestId) {
+            listState.scrollToItem(0)
+            shownNewestId = newestId
+        }
+    }
+    LazyColumn(modifier = modifier, state = listState) {
+        items(assets, key = { it.id }) { asset ->
+            AssetRow(
+                asset = asset,
+                playing = asset.id == playingId,
+                onTogglePlay = { onTogglePlay(asset) },
+                onDelete = { onAskDelete(asset) },
+            )
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        }
+    }
+}
+
+@Composable
+private fun FilterRow(selectedFilter: AssetFilter, onSelect: (AssetFilter) -> Unit) {
+    Row(
+        modifier = Modifier
+            .widthIn(max = ContentMaxWidth)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssetFilter.entries.forEach { option ->
+            val selected = option == selectedFilter
+            FilterChip(
+                selected = selected,
+                onClick = { onSelect(option) },
+                label = { Text(stringResource(option.label)) },
+                leadingIcon = {
+                    val icon = if (selected) R.drawable.ic_check else option.icon
+                    Icon(painterResource(icon), contentDescription = null, Modifier.size(18.dp))
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    iconColor = MaterialTheme.colorScheme.primary,
+                ),
+                border = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(filtered: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 48.dp, bottom = FabClearance),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 480.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (filtered) {
+                Text(
+                    text = stringResource(R.string.assets_empty_filtered),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            } else {
                 Icon(
                     painterResource(R.drawable.ic_perm_media),
                     contentDescription = null,
@@ -127,24 +283,132 @@ fun AssetsScreen(onBack: () -> Unit) {
     }
 }
 
-/**
- * Importar llega en una fase posterior. El FAB de M3 no tiene estado deshabilitado, así que se pinta
- * con los colores de deshabilitado de M3 y se anuncia deshabilitado y sin acción.
- */
 @Composable
-private fun DisabledImportButton() {
-    val label = stringResource(R.string.assets_import)
-    val disabledContent = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    ExtendedFloatingActionButton(
-        onClick = {},
-        containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-        contentColor = disabledContent,
-        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-        icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-        text = { Text(label) },
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = label
-            disabled()
+private fun AssetRow(
+    asset: Asset,
+    playing: Boolean,
+    onTogglePlay: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val name = assetName(asset)
+    val clickModifier = if (asset.type == AssetType.Audio) {
+        val label = stringResource(if (playing) R.string.assets_pause else R.string.assets_play, name)
+        Modifier.clickable(onClickLabel = label, onClick = onTogglePlay)
+    } else {
+        Modifier
+    }
+    ListItem(
+        modifier = clickModifier,
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        leadingContent = { AssetTile(asset.type, playing) },
+        supportingContent = {
+            Text(
+                assetSubtitle(asset),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         },
-    )
+        trailingContent = { AssetMenu(name, onDelete) },
+    ) {
+        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun AssetTile(type: AssetType, playing: Boolean) {
+    val icon = when {
+        playing -> R.drawable.ic_pause
+        type == AssetType.Audio -> R.drawable.ic_music_note
+        else -> R.drawable.ic_image
+    }
+    val colors = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .background(
+                if (playing) colors.primaryContainer else colors.surfaceContainerHigh,
+                RoundedCornerShape(12.dp),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painterResource(icon),
+            contentDescription = null,
+            tint = if (playing) colors.onPrimaryContainer else colors.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun AssetMenu(name: String, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                painterResource(R.drawable.ic_more_vert),
+                contentDescription = stringResource(R.string.assets_more, name),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            // Las hopes llegan en una fase posterior: estas acciones se ven, deshabilitadas.
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.assets_use_new_hope)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                onClick = {},
+                enabled = false,
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.assets_use_existing_hope)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_bookmark_add), contentDescription = null) },
+                onClick = {},
+                enabled = false,
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.assets_delete), color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        painterResource(R.drawable.ic_delete),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportButton(onImportVisual: () -> Unit, onImportAudio: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        ExtendedFloatingActionButton(
+            onClick = { expanded = true },
+            icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+            text = { Text(stringResource(R.string.assets_import)) },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.assets_import_visual)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onImportVisual()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.assets_import_audio)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_music_note), contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onImportAudio()
+                },
+            )
+        }
+    }
 }

@@ -1,5 +1,10 @@
 package dev.tacuchi.hope.navigation
 
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -30,6 +35,12 @@ class NavigationTest {
         compose.onNodeWithText(text(R.string.library_empty_title)).assertExists()
     }
 
+    /** Assets lee el catálogo de Room en segundo plano: el estado vacío llega después. */
+    @OptIn(ExperimentalTestApi::class)
+    private fun waitForEmptyAssets() {
+        compose.waitUntilExactlyOneExists(hasText(text(R.string.assets_empty_title)), timeoutMillis = 5_000)
+    }
+
     @Test
     fun opensWithEmptyLibrary() {
         assertOnLibrary()
@@ -58,8 +69,8 @@ class NavigationTest {
     @Test
     fun assetsOpensAndReturnsWithSystemBack() {
         compose.onNodeWithContentDescription(text(R.string.library_assets)).performClick()
-        compose.onNodeWithText(text(R.string.assets_empty_title)).assertExists()
-        compose.onNodeWithContentDescription(text(R.string.assets_import)).assertIsNotEnabled()
+        waitForEmptyAssets()
+        compose.onNode(hasClickAction() and hasAnyDescendant(hasText(text(R.string.assets_import))), useUnmergedTree = true).assertIsEnabled()
 
         pressBack()
         assertOnLibrary()
@@ -82,7 +93,7 @@ class NavigationTest {
 
         compose.activityRule.scenario.recreate()
 
-        compose.onNodeWithText(text(R.string.assets_empty_title)).assertExists()
+        waitForEmptyAssets()
         pressBack()
         assertOnLibrary()
     }

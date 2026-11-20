@@ -5,6 +5,9 @@
     <!-- Comunes -->
     <string name="action_back">Volver</string>
     <string name="action_close">Cerrar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_continue">Seguir</string>
+    <string name="action_accept">Aceptar</string>
 
     <!-- Biblioteca -->
     <string name="library_title">Hope</string>
@@ -36,6 +39,62 @@
     <string name="assets_empty_title">Aún no tienes assets</string>
     <string name="assets_empty_body">Los audios y las imágenes que importes o extraigas de un video aparecen aquí.</string>
     <string name="assets_import">Importar</string>
+    <string name="assets_empty_filtered">No hay assets de este tipo.</string>
+    <string name="assets_import_visual">Foto o video</string>
+    <string name="assets_import_audio">Archivo de audio</string>
+    <string name="assets_more">Más opciones de %1$s</string>
+    <string name="assets_play">Escuchar %1$s</string>
+    <string name="assets_pause">Pausar %1$s</string>
+    <string name="assets_use_new_hope">Usar en una hope nueva</string>
+    <string name="assets_use_existing_hope">Usar en una hope existente</string>
+    <string name="assets_delete">Borrar</string>
+    <string name="assets_delete_title">¿Borrar «%1$s»?</string>
+    <string name="assets_delete_body">Se quita de Assets y se libera su espacio en el teléfono.</string>
+    <string name="assets_subtitle_separator">" · "</string>
+
+    <!-- Nombres de assets -->
+    <string name="asset_name_audio_from_video">Audio de video %1$d</string>
+    <string name="asset_name_voice_note">Nota de voz %1$d</string>
+    <string name="asset_name_image">Imagen %1$d</string>
+    <string name="asset_name_frame">Fotograma %1$s</string>
+
+    <!-- Orígenes -->
+    <string name="origin_whatsapp">WhatsApp</string>
+    <string name="origin_telegram">Telegram</string>
+    <string name="origin_tiktok">TikTok</string>
+    <string name="origin_gallery">Galería</string>
+    <string name="origin_files">Archivos</string>
+    <string name="origin_shared">Compartido</string>
+    <string name="origin_recording">Grabación</string>
+
+    <!-- Importar -->
+    <string name="import_preparing">Preparando…</string>
+    <string name="import_saving">Guardando en Assets…</string>
+    <string name="import_extracting_title">Extrayendo audio</string>
+    <string name="import_extracting_body">El audio se saca del video en el teléfono. Puede tardar un poco.</string>
+    <string name="import_progress">%1$d %%</string>
+    <string name="import_unsupported_title">Hope no puede usar este archivo</string>
+    <string name="import_unsupported_body">Llegó un archivo %1$s. Hope acepta videos (MP4, WebM, 3GP), audios (MP3, M4A, AAC, OGG, Opus, WAV) e imágenes (JPG, PNG, WebP).</string>
+    <string name="import_unsupported_unknown">de formato desconocido</string>
+    <string name="import_long_title">Dura más de 10 minutos</string>
+    <string name="import_long_body">Dura %1$s. La extracción puede tardar y ocupar espacio en el teléfono.</string>
+    <string name="import_no_audio_title">Este video no tiene audio</string>
+    <string name="import_no_audio_body">Puedes guardar solo la portada como imagen.</string>
+    <string name="import_no_audio_cover">Elegir portada</string>
+    <string name="import_failed_title">No se pudo importar</string>
+    <string name="import_failed_body">El archivo no se pudo leer o extraer. No se guardó nada.</string>
+
+    <!-- Elegir portada -->
+    <string name="cover_title">Elegir portada</string>
+    <string name="cover_use">Usar</string>
+    <string name="cover_frame_at">Fotograma en %1$s</string>
+    <string name="cover_gallery_selected">Imagen de la galería</string>
+    <string name="cover_position">Posición en el video</string>
+    <string name="cover_suggested">Fotogramas sugeridos</string>
+    <string name="cover_suggested_item">Fotograma en %1$s</string>
+    <string name="cover_use_gallery">Usar una imagen de la galería</string>
+    <string name="cover_saved_hint">El fotograma se guarda en Assets</string>
+    <string name="cover_gallery_hint">La imagen se guarda en Assets</string>
 
     <!-- Nueva hope -->
     <string name="editor_title">Nueva hope</string>

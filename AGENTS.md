@@ -20,9 +20,12 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 | Core KTX | 1.19.1 |
 | Core SplashScreen | 1.2.0 |
 | kotlinx-serialization | 1.13.0 |
+| Room | 2.8.5 |
+| KSP | 2.3.14 |
+| Media3 (Transformer, ExoPlayer, Common) | 1.11.1 |
 | JUnit | 4.13.2 |
 | Robolectric | 4.18.1 |
-| AndroidX Test core / ext-junit | 1.7.0 / 1.3.0 |
+| AndroidX Test core / ext-junit / runner | 1.7.0 / 1.3.0 / 1.7.0 |
 | JDK | 21 |
 | SDK | minSdk 29 · targetSdk 36 · compileSdk 37.2 |
 
@@ -35,8 +38,12 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 - Una sola actividad (`MainActivity`) con la API de pantalla de inicio y `enableEdgeToEdge()`. Todo se dibuja en Compose.
 - Navegación con Navigation 3: rutas `@Serializable` que implementan `NavKey` en `navigation/HopeNavigation.kt`, pila con `rememberNavBackStack`.
 - Pantallas en `ui/<pantalla>/`. Cada una recibe callbacks de navegación, nunca la pila.
-- Estado: cuando una pantalla tenga datos, un `ViewModel` expone `StateFlow` y la pantalla lo lee con `collectAsStateWithLifecycle()`.
-- Inyección manual (constructores y una fábrica por ViewModel). Hilt se evalúa cuando lleguen Room y Media3.
+- Estado: cuando una pantalla tiene datos, un `ViewModel` expone `StateFlow` y la pantalla lo lee con `collectAsStateWithLifecycle()`. La parte visual sin estado (`AssetsContent`) se prueba sola.
+- Inyección manual: `HopeApplication` crea un `AppContainer` con la base, el repositorio y los servicios de importación; cada ViewModel tiene su `Factory`. Con un solo módulo, Hilt sumaría plugin y anotaciones sin beneficio.
+- Datos (`data/`): Room guarda el catálogo de assets; los archivos viven en `filesDir/assets/`. El nombre visible se arma con el tipo y el número (o el momento del fotograma), no se guarda. El esquema se exporta a `app/schemas/`.
+- Importación (`importing/`): todo lo recibido se copia primero a `filesDir/import-tmp/<sesión>/`, se inspecciona por su contenido (no por la extensión) y solo al confirmar pasa a ser asset. Cancelar o fallar borra la sesión.
+- Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` con `@OptIn(UnstableApi::class)`.
+- Compartir: `MainActivity` es `singleTask` y recibe `ACTION_SEND` de video, audio e imagen en `onCreate` y `onNewIntent`. El origen sale del referrer con una tabla de apps conocidas; si no, «Compartido».
 
 ## Tema y diseño
 
@@ -55,7 +62,9 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 
 ## Pruebas
 
-- Unitarias en `app/src/test`. Las de interfaz corren con Robolectric dentro de `testDebugUnitTest`, sin emulador.
+- Unitarias en `app/src/test`. Las de interfaz y las de Room (base en memoria) corren con Robolectric dentro de `testDebugUnitTest`, sin emulador.
+- Instrumentadas en `app/src/androidTest`: inspección de archivos reales y extracción con Media3. Necesitan emulador: `./gradlew connectedDebugAndroidTest`. No corren en CI.
+- Los archivos de prueba son sintéticos (tonos y colores). Se regeneran con `scripts/generar-medios-de-prueba.sh`; con una carpeta como argumento genera además los grandes (60 s y 11 min) para probar en el emulador, que no van al repo.
 - `ui/theme/ContrastTest.kt` mide el contraste WCAG de los pares de roles usados: texto 4,5:1, íconos y bordes 3:1.
 - `navigation/NavigationTest.kt` recorre los destinos, vuelve con Atrás y comprueba que la pila sobrevive a recrear la actividad.
 - Cada prueba demuestra un comportamiento; no se prueban mapeos triviales.
@@ -82,6 +91,8 @@ android layout                                  # textos y estado de los control
 adb shell cmd uimode night yes                  # tema oscuro (no para claro)
 android emulator stop
 ```
+
+Compartir desde la terminal con `adb shell am start -a android.intent.action.SEND` no sirve: el shell no puede conceder permiso de lectura sobre un archivo de MediaStore. Se comparte desde la app Archivos del emulador (mantener pulsado, Compartir, Hope).
 
 ## Probar en el teléfono
 
