@@ -23,6 +23,18 @@ object Links {
         LinkNetwork.Instagram to "https://www.instagram.com/explore/tags/hopecore/",
     )
 
+    /**
+     * La app de TikTok no recibe enlaces web de búsqueda: con `https://` se abre el navegador. Su
+     * esquema propio sí abre la búsqueda dentro de la app, pero TikTok no lo documenta.
+     */
+    private val appSearches: Map<LinkNetwork, String> = mapOf(
+        LinkNetwork.TikTok to "tiktok://search?keyword=hopecore",
+    )
+
+    /** Qué abrir, en orden, para buscar en [network]: su app si tiene esquema propio, luego la web. */
+    fun searchTargets(network: LinkNetwork): List<String> =
+        listOfNotNull(appSearches[network], searches[network])
+
     private val urlInText = Regex("""https?://[^\s<>"]+""", RegexOption.IGNORE_CASE)
 
     /**

@@ -35,19 +35,19 @@ import androidx.compose.ui.unit.dp
 import dev.tacuchi.hope.R
 import dev.tacuchi.hope.links.LinkNetwork
 import dev.tacuchi.hope.links.Links
-import dev.tacuchi.hope.ui.common.openLink
+import dev.tacuchi.hope.ui.common.openFirst
 
 private data class Network(
     @StringRes val name: Int,
     @StringRes val hint: Int,
     @DrawableRes val icon: Int,
-    val searchUrl: String,
+    val network: LinkNetwork,
 )
 
 private val networks = listOf(
-    Network(R.string.search_tiktok, R.string.search_tiktok_hint, R.drawable.ic_smart_display, Links.searches.getValue(LinkNetwork.TikTok)),
-    Network(R.string.search_youtube, R.string.search_youtube_hint, R.drawable.ic_play_circle, Links.searches.getValue(LinkNetwork.YouTube)),
-    Network(R.string.search_instagram, R.string.search_instagram_hint, R.drawable.ic_photo_camera, Links.searches.getValue(LinkNetwork.Instagram)),
+    Network(R.string.search_tiktok, R.string.search_tiktok_hint, R.drawable.ic_smart_display, LinkNetwork.TikTok),
+    Network(R.string.search_youtube, R.string.search_youtube_hint, R.drawable.ic_play_circle, LinkNetwork.YouTube),
+    Network(R.string.search_instagram, R.string.search_instagram_hint, R.drawable.ic_photo_camera, LinkNetwork.Instagram),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +83,7 @@ fun SearchScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             SearchTerm()
-            networks.forEach { network -> NetworkCard(network) { openLink(context, network.searchUrl) } }
+            networks.forEach { network -> NetworkCard(network) { openFirst(context, Links.searchTargets(network.network)) } }
             FoundOneCard()
         }
     }

@@ -26,11 +26,23 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Abre el enlace en la app de su red, si está instalada, o en el navegador. */
-fun openLink(context: Context, url: String) {
+fun openLink(context: Context, url: String) = openFirst(context, listOf(url))
+
+/**
+ * Abre el primero de [urls] que alguna app reciba. Se prueba abriendo, sin consultar qué hay
+ * instalado: así no hace falta declarar `<queries>`. Si ninguno abre, lo avisa.
+ */
+fun openFirst(context: Context, urls: List<String>) {
+    val opened = openFirst(urls) { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+    if (!opened) Toast.makeText(context, R.string.link_open_failed, Toast.LENGTH_SHORT).show()
+}
+
+internal fun openFirst(urls: List<String>, start: (String) -> Unit): Boolean = urls.any { url ->
     try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+        start(url)
+        true
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, R.string.link_open_failed, Toast.LENGTH_SHORT).show()
+        false
     }
 }
 
