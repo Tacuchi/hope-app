@@ -16,6 +16,14 @@ data class NewAsset(
     val frameMs: Long? = null,
 )
 
+/** Resultado de intentar borrar un asset. */
+sealed interface AssetDeletion {
+    data object Deleted : AssetDeletion
+
+    /** No se borró: lo usan estas hopes. */
+    data class InUse(val hopes: List<AssetUse>) : AssetDeletion
+}
+
 /**
  * Catálogo de assets: las filas viven en Room y los archivos en [assetsDir], dentro del
  * almacenamiento privado de la app.
@@ -26,6 +34,7 @@ class AssetRepository(
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private val dao = database.assetDao()
+    private val hopeDao = database.hopeDao()
 
     fun observe(type: AssetType?): Flow<List<Asset>> = dao.observe(type)
 
@@ -69,10 +78,16 @@ class AssetRepository(
         }
     }
 
-    /** Quita la fila y libera el archivo. */
-    suspend fun delete(asset: Asset) = withContext(Dispatchers.IO) {
-        dao.delete(asset)
+    suspend fun get(id: Long): Asset? = dao.get(id)
+
+    /** Quita la fila y libera el archivo, salvo que alguna hope lo use: entonces no toca nada. */
+    suspend fun delete(asset: Asset): AssetDeletion = withContext(Dispatchers.IO) {
+        val uses = database.withTransaction {
+            hopeDao.usesOf(asset.id).also { if (it.isEmpty()) dao.delete(asset) }
+        }
+        if (uses.isNotEmpty()) return@withContext AssetDeletion.InUse(uses)
         fileOf(asset).delete()
+        AssetDeletion.Deleted
     }
 
     private fun uniqueTarget(extension: String): File {

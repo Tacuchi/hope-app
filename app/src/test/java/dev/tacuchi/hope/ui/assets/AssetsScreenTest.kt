@@ -16,6 +16,7 @@ import dev.tacuchi.hope.R
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetNameKind
 import dev.tacuchi.hope.data.AssetOrigin
+import dev.tacuchi.hope.data.AssetUse
 import dev.tacuchi.hope.ui.theme.HopeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -50,15 +51,24 @@ class AssetsScreenTest {
     private var deleted: Asset? = null
     private var toggled: Asset? = null
 
-    private fun show(assets: List<Asset>) {
+    private var usedInNew: Asset? = null
+    private var placed: Pair<Asset, Long>? = null
+
+    private fun show(
+        assets: List<Asset>,
+        uses: Map<Long, List<AssetUse>> = emptyMap(),
+        hopes: List<HopeChoice> = emptyList(),
+    ) {
         compose.setContent {
             HopeTheme {
                 AssetsContent(
-                    state = AssetsUiState(assets = assets),
+                    state = AssetsUiState(assets = assets, uses = uses, hopes = hopes),
                     onBack = {},
                     onSelectFilter = {},
                     onTogglePlay = { toggled = it },
                     onDelete = { deleted = it },
+                    onUseInNewHope = { usedInNew = it },
+                    onUseInHope = { asset, hopeId -> placed = asset to hopeId },
                     onImportVisual = {},
                     onImportAudio = {},
                 )
@@ -90,8 +100,6 @@ class AssetsScreenTest {
         val name = text(R.string.asset_name_frame, "0:14")
 
         compose.onNodeWithContentDescription(text(R.string.assets_more, name)).performClick()
-        compose.onNodeWithText(text(R.string.assets_use_new_hope)).assertIsNotEnabled()
-        compose.onNodeWithText(text(R.string.assets_use_existing_hope)).assertIsNotEnabled()
         compose.onNodeWithText(text(R.string.assets_delete)).performClick()
 
         assertEquals(null, deleted)
@@ -113,6 +121,8 @@ class AssetsScreenTest {
                     onSelectFilter = {},
                     onTogglePlay = {},
                     onDelete = {},
+                    onUseInNewHope = {},
+                    onUseInHope = { _, _ -> },
                     onImportVisual = { visual = true },
                     onImportAudio = { audioPicker = true },
                 )
@@ -127,5 +137,44 @@ class AssetsScreenTest {
         compose.onNode(hasClickAction() and hasAnyDescendant(hasText(text(R.string.assets_import))), useUnmergedTree = true).performClick()
         compose.onNodeWithText(text(R.string.assets_import_audio)).performClick()
         assertTrue(audioPicker)
+    }
+
+    @Test
+    fun anAssetInUseShowsItsCountAndListsTheHopesInsteadOfDeleting() {
+        val uses = listOf(AssetUse(audio.id, 2, "Antes de entrar"), AssetUse(audio.id, 1, "Respira"))
+        show(listOf(audio, frame), uses = mapOf(audio.id to uses))
+        val name = text(R.string.asset_name_audio_from_video, 1)
+
+        compose.onNodeWithText("En uso en 2 hopes").assertExists()
+        compose.onNodeWithContentDescription(text(R.string.assets_more, name)).performClick()
+        compose.onNodeWithText(text(R.string.assets_delete)).performClick()
+
+        compose.onNodeWithText(text(R.string.assets_in_use_title, name)).assertExists()
+        compose.onNodeWithText(text(R.string.assets_in_use_item, "Antes de entrar")).assertExists()
+        compose.onNodeWithText(text(R.string.assets_in_use_item, "Respira")).assertExists()
+        compose.onNodeWithText(text(R.string.action_accept)).performClick()
+        assertEquals(null, deleted)
+    }
+
+    @Test
+    fun usesTheAssetInANewHopeOrInAnExistingOne() {
+        show(listOf(audio), hopes = listOf(HopeChoice(7, "Respira")))
+        val name = text(R.string.asset_name_audio_from_video, 1)
+
+        compose.onNodeWithContentDescription(text(R.string.assets_more, name)).performClick()
+        compose.onNodeWithText(text(R.string.assets_use_new_hope)).performClick()
+        assertEquals(audio, usedInNew)
+
+        compose.onNodeWithContentDescription(text(R.string.assets_more, name)).performClick()
+        compose.onNodeWithText(text(R.string.assets_use_existing_hope)).performClick()
+        compose.onNodeWithText("Respira").performClick()
+        assertEquals(audio to 7L, placed)
+    }
+
+    @Test
+    fun withoutSavedHopesUsingInAnExistingOneIsDisabled() {
+        show(listOf(audio))
+        compose.onNodeWithContentDescription(text(R.string.assets_more, text(R.string.asset_name_audio_from_video, 1))).performClick()
+        compose.onNodeWithText(text(R.string.assets_use_existing_hope)).assertIsNotEnabled()
     }
 }

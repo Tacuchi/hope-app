@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.tacuchi.hope.appContainer
+import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetNameKind
 import dev.tacuchi.hope.data.AssetOrigin
 import dev.tacuchi.hope.data.AssetRepository
@@ -21,6 +22,7 @@ import dev.tacuchi.hope.importing.ImportDecision
 import dev.tacuchi.hope.importing.ImportStaging
 import dev.tacuchi.hope.importing.MediaInspector
 import dev.tacuchi.hope.importing.StagedFile
+import dev.tacuchi.hope.importing.audioNameKind
 import dev.tacuchi.hope.importing.isLong
 import dev.tacuchi.hope.importing.receivedFormatLabel
 import kotlinx.coroutines.CancellationException
@@ -38,6 +40,19 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 
 /** Un fotograma sugerido en «Elegir portada». */
 data class SuggestedFrame(val positionMs: Long, val thumbnail: Bitmap?)
+
+/** Quién pidió la importación: decide adónde lleva al terminar. */
+enum class ImportPurpose {
+    /** Desde Assets: al terminar se ve Assets con lo nuevo arriba. */
+    Catalog,
+
+    /** Compartido desde otra app: al terminar abre Nueva hope con lo creado. */
+    Share,
+
+    /** Desde el editor: lo creado vuelve al editor, a la portada o al fondo. */
+    EditorCover,
+    EditorBackground,
+}
 
 /** Por dónde va una importación. */
 sealed interface ImportState {
@@ -58,8 +73,8 @@ sealed interface ImportState {
     data object Saving : ImportState
     data object Failed : ImportState
 
-    /** Terminó y creó sus assets; la navegación muestra Assets y vuelve a [Idle]. */
-    data object Finished : ImportState
+    /** Terminó y creó [assets]; la navegación los lleva según [purpose] y vuelve a [Idle]. */
+    data class Finished(val purpose: ImportPurpose, val assets: List<Asset>) : ImportState
 }
 
 /**
@@ -81,6 +96,7 @@ class ImportViewModel(
     private var session: File? = null
     private var staged: StagedFile? = null
     private var origin: AssetOrigin = AssetOrigin.Shared
+    private var purpose: ImportPurpose = ImportPurpose.Catalog
     private var pending: ImportDecision? = null
     private var extractedAudio: File? = null
     private var extractedDurationMs: Long? = null
@@ -92,9 +108,10 @@ class ImportViewModel(
         viewModelScope.launch(Dispatchers.IO) { staging.discardAll() }
     }
 
-    fun start(uri: Uri, declaredMime: String?, origin: AssetOrigin) {
+    fun start(uri: Uri, declaredMime: String?, origin: AssetOrigin, purpose: ImportPurpose = ImportPurpose.Catalog) {
         cleanup()
         this.origin = origin
+        this.purpose = purpose
         _state.value = ImportState.Preparing
         job = viewModelScope.launch {
             try {
@@ -171,9 +188,7 @@ class ImportViewModel(
             try {
                 val items = buildList {
                     val audio = extractedAudio
-                    if (!current.coverOnly && audio != null) {
-                        add(NewAsset(audio, AssetNameKind.AudioFromVideo, origin, "audio/mp4", durationMs = extractedDurationMs))
-                    }
+                    if (!current.coverOnly && audio != null) add(extractedAudioAsset(audio))
                     val gallery = galleryFile
                     if (gallery != null) {
                         add(NewAsset(gallery.file, AssetNameKind.Image, AssetOrigin.Gallery, mimeOf(gallery)))
@@ -183,8 +198,7 @@ class ImportViewModel(
                         add(NewAsset(frame, AssetNameKind.Frame, origin, "image/jpeg", frameMs = current.positionMs))
                     }
                 }
-                repository.add(items)
-                finish()
+                finish(repository.add(items))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -193,15 +207,33 @@ class ImportViewModel(
         }
     }
 
-    /** Cancela en cualquier paso: no crea assets y borra los temporales. */
+    /**
+     * Cancela. En «Elegir portada» el audio ya extraído se guarda igual, sin portada; en cualquier
+     * otro paso no crea assets y borra los temporales.
+     */
     fun cancel() {
+        val current = _state.value
+        val audio = extractedAudio
+        if (current is ImportState.ChoosingCover && !current.coverOnly && audio != null) {
+            _state.value = ImportState.Saving
+            job = viewModelScope.launch {
+                try {
+                    finish(repository.add(listOf(extractedAudioAsset(audio))))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    fail(error)
+                }
+            }
+            return
+        }
         cleanup()
         _state.value = ImportState.Idle
     }
 
-    /** La navegación ya mostró el resultado. */
+    /** La navegación ya llevó el resultado a su lugar. */
     fun acknowledgeFinished() {
-        if (_state.value == ImportState.Finished) _state.value = ImportState.Idle
+        if (_state.value is ImportState.Finished) _state.value = ImportState.Idle
     }
 
     private suspend fun proceed(decision: ImportDecision) {
@@ -209,15 +241,12 @@ class ImportViewModel(
         when (decision) {
             is ImportDecision.Image -> {
                 _state.value = ImportState.Saving
-                repository.add(listOf(NewAsset(file.file, AssetNameKind.Image, origin, mimeOf(file))))
-                finish()
+                finish(repository.add(listOf(NewAsset(file.file, AssetNameKind.Image, origin, mimeOf(file)))))
             }
             is ImportDecision.Audio -> {
                 _state.value = ImportState.Saving
-                repository.add(
-                    listOf(NewAsset(file.file, AssetNameKind.VoiceNote, origin, mimeOf(file), durationMs = decision.durationMs)),
-                )
-                finish()
+                val kind = audioNameKind(file.file.extension, file.declaredMime)
+                finish(repository.add(listOf(NewAsset(file.file, kind, origin, mimeOf(file), durationMs = decision.durationMs))))
             }
             is ImportDecision.VideoWithoutAudio -> _state.value = ImportState.NoAudio
             is ImportDecision.VideoWithAudio -> extract(file.file)
@@ -278,9 +307,12 @@ class ImportViewModel(
         }
     }
 
-    private fun finish() {
+    private fun extractedAudioAsset(audio: File) =
+        NewAsset(audio, AssetNameKind.AudioFromVideo, origin, "audio/mp4", durationMs = extractedDurationMs)
+
+    private fun finish(created: List<Asset>) {
         cleanup(keepState = true)
-        _state.value = ImportState.Finished
+        _state.value = ImportState.Finished(purpose, created)
     }
 
     private fun fail(error: Exception) {

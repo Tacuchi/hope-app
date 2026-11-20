@@ -17,6 +17,19 @@
     <string name="library_empty_body">Comparte un video desde WhatsApp o TikTok a Hope, o empieza aquí con tu voz.</string>
     <string name="library_new_hope">Nueva hope</string>
     <string name="library_find_inspiration">Buscar inspiración</string>
+    <string name="library_new">Nueva</string>
+    <string name="library_your_hopes">Tus hopes</string>
+    <plurals name="library_count">
+        <item quantity="one">%1$d hope</item>
+        <item quantity="other">%1$d hopes</item>
+    </plurals>
+    <string name="library_play">Escuchar %1$s</string>
+    <string name="library_pause">Pausar %1$s</string>
+    <string name="library_more">Más opciones de %1$s</string>
+    <string name="library_edit">Editar</string>
+    <string name="library_delete">Borrar</string>
+    <string name="library_delete_title">¿Borrar «%1$s»?</string>
+    <string name="library_delete_body">Se quita de la biblioteca. Su portada y sus audios siguen en Assets.</string>
 
     <!-- Buscar en redes -->
     <string name="search_title">Buscar en redes</string>
@@ -51,12 +64,25 @@
     <string name="assets_delete_title">¿Borrar «%1$s»?</string>
     <string name="assets_delete_body">Se quita de Assets y se libera su espacio en el teléfono.</string>
     <string name="assets_subtitle_separator">" · "</string>
+    <plurals name="assets_in_use">
+        <item quantity="one">En uso en %1$d hope</item>
+        <item quantity="other">En uso en %1$d hopes</item>
+    </plurals>
+    <string name="assets_in_use_title">«%1$s» está en uso</string>
+    <plurals name="assets_in_use_body">
+        <item quantity="one">No se puede borrar mientras lo use esta hope:</item>
+        <item quantity="other">No se puede borrar mientras lo usen estas %1$d hopes:</item>
+    </plurals>
+    <string name="assets_in_use_item">• %1$s</string>
+    <string name="assets_choose_hope_title">¿En qué hope pones «%1$s»?</string>
 
     <!-- Nombres de assets -->
     <string name="asset_name_audio_from_video">Audio de video %1$d</string>
     <string name="asset_name_voice_note">Nota de voz %1$d</string>
     <string name="asset_name_image">Imagen %1$d</string>
     <string name="asset_name_frame">Fotograma %1$s</string>
+    <string name="asset_name_audio">Audio %1$d</string>
+    <string name="asset_name_recording">Grabación %1$d</string>
 
     <!-- Orígenes -->
     <string name="origin_whatsapp">WhatsApp</string>
@@ -98,12 +124,34 @@
 
     <!-- Nueva hope -->
     <string name="editor_title">Nueva hope</string>
+    <string name="editor_title_edit">Editar hope</string>
+    <string name="editor_pick_cover">Elegir portada</string>
+    <string name="editor_change_cover">Cambiar portada</string>
+    <string name="editor_pick_audio">Elegir</string>
+    <string name="editor_change_audio">Cambiar</string>
+    <string name="editor_play_background">Escuchar el fondo</string>
+    <string name="editor_pause_background">Pausar el fondo</string>
+    <string name="editor_volume_background">Volumen del fondo</string>
+    <string name="editor_volume_voice">Volumen de la voz</string>
+    <string name="editor_voice_take">Toma de %1$s</string>
+    <string name="editor_record_again">Grabar de nuevo</string>
+    <string name="editor_mic_denied">Para grabar tu voz, Hope necesita el micrófono. Puedes permitirlo en los ajustes; mientras tanto, lo demás del editor sigue funcionando.</string>
+    <string name="editor_open_settings">Abrir ajustes</string>
+    <string name="editor_recording_failed">No se pudo grabar. Inténtalo de nuevo.</string>
+    <string name="editor_pause">Pausar</string>
+    <string name="editor_error_title">Ponle un título</string>
+    <string name="editor_error_tracks">Elige una pista de fondo o graba tu voz para guardar.</string>
+    <string name="editor_pick_cover_title">Portada</string>
+    <string name="editor_pick_audio_title">Pista de fondo</string>
+    <string name="editor_import_visual">Importar foto o video</string>
+    <string name="editor_import_video">Importar el audio de un video</string>
+    <string name="editor_import_audio">Importar un archivo de audio</string>
+    <string name="editor_no_images">Aún no hay imágenes en Assets.</string>
+    <string name="editor_no_audios">Aún no hay audios en Assets.</string>
     <string name="editor_cover">Portada</string>
-    <string name="editor_change_frame">Cambiar fotograma</string>
     <string name="editor_field_title">Título</string>
     <string name="editor_background_track">Pista de fondo</string>
     <string name="editor_background_empty">Sin audio todavía</string>
-    <string name="editor_play">Reproducir</string>
     <string name="editor_volume">Volumen</string>
     <string name="editor_percent">%1$d %%</string>
     <string name="editor_trim">Recorte</string>
@@ -119,5 +167,16 @@
     <string name="editor_link_help">Se abre en su app. No se guarda el video.</string>
     <string name="editor_listen">Escuchar</string>
     <string name="editor_save">Guardar</string>
-    <string name="editor_zero_time">0:00</string>
+
+    <!-- Grabando voz -->
+    <string name="recording_title">Grabando voz</string>
+    <string name="recording_background_on">El fondo suena a %1$d %% para que te guíes.</string>
+    <string name="recording_background_off">Sin audífonos se graba en silencio, para que el fondo no se cuele en tu voz.</string>
+    <string name="recording_no_background">Habla cuando quieras.</string>
+    <string name="recording_on">Grabando</string>
+    <string name="recording_ready">Toma lista</string>
+    <string name="recording_stop">Detener</string>
+    <string name="recording_discard">Descartar</string>
+    <string name="recording_done">Listo</string>
+    <string name="recording_discard_hint">Si descartas, la toma no se guarda.</string>
 </resources>

@@ -31,8 +31,10 @@ class NavigationTest {
         compose.waitForIdle()
     }
 
+    /** La biblioteca lee las hopes de Room en segundo plano: el estado vacío llega después. */
+    @OptIn(ExperimentalTestApi::class)
     private fun assertOnLibrary() {
-        compose.onNodeWithText(text(R.string.library_empty_title)).assertExists()
+        compose.waitUntilExactlyOneExists(hasText(text(R.string.library_empty_title)), timeoutMillis = 5_000)
     }
 
     /** Assets lee el catálogo de Room en segundo plano: el estado vacío llega después. */
@@ -59,6 +61,7 @@ class NavigationTest {
 
     @Test
     fun searchOpensFromInspirationButtonAndReturnsWithSystemBack() {
+        assertOnLibrary()
         compose.onNodeWithText(text(R.string.library_find_inspiration)).performClick()
         compose.onNodeWithText(text(R.string.search_intro)).assertExists()
 
@@ -76,12 +79,15 @@ class NavigationTest {
         assertOnLibrary()
     }
 
+    @OptIn(ExperimentalTestApi::class)
     @Test
-    fun newHopeOpensWithFutureControlsDisabledAndCloses() {
+    fun newHopeOpensTheEditorAndCloses() {
+        assertOnLibrary()
         compose.onNodeWithText(text(R.string.library_new_hope)).performClick()
-        compose.onNodeWithText(text(R.string.editor_save)).assertIsNotEnabled()
+        compose.waitUntilExactlyOneExists(hasText(text(R.string.editor_record)), timeoutMillis = 5_000)
+        // Sin pistas no hay nada que escuchar; el enlace de origen llega en otra fase.
         compose.onNodeWithText(text(R.string.editor_listen)).assertIsNotEnabled()
-        compose.onNodeWithText(text(R.string.editor_record)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.editor_save)).assertIsEnabled()
 
         compose.onNodeWithContentDescription(text(R.string.action_close)).performClick()
         assertOnLibrary()

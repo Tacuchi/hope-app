@@ -11,6 +11,7 @@ import androidx.core.content.IntentCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dev.tacuchi.hope.importing.OriginResolver
 import dev.tacuchi.hope.navigation.HopeNavigation
+import dev.tacuchi.hope.ui.importing.ImportPurpose
 import dev.tacuchi.hope.ui.importing.ImportViewModel
 import dev.tacuchi.hope.ui.theme.HopeTheme
 
@@ -31,6 +32,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** La hope solo suena con la app a la vista: salir o bloquear la pantalla la pausa. */
+    override fun onStop() {
+        super.onStop()
+        appContainer.mixPlayer.pause()
+    }
+
     /** Hope ya estaba abierta (singleTask): lo compartido llega a la misma instancia. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -42,6 +49,6 @@ class MainActivity : ComponentActivity() {
         if (intent.action != Intent.ACTION_SEND) return
         val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
         val origin = OriginResolver.fromReferrer(referrer?.toString())
-        importViewModel.start(uri, intent.type, origin)
+        importViewModel.start(uri, intent.type, origin, ImportPurpose.Share)
     }
 }

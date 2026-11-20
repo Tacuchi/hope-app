@@ -10,9 +10,14 @@ enum class AssetType { Audio, Image }
 /** Cómo se nombra un asset: por tipo y número, o por el momento del video en un fotograma. */
 enum class AssetNameKind(val type: AssetType) {
     AudioFromVideo(AssetType.Audio),
+    /** Solo audios OGG u Opus, como las notas de voz de WhatsApp. */
     VoiceNote(AssetType.Audio),
     Image(AssetType.Image),
     Frame(AssetType.Image),
+    /** Cualquier otro audio importado. */
+    Audio(AssetType.Audio),
+    /** Una toma grabada en el editor. */
+    Recording(AssetType.Audio),
 }
 
 /** De dónde vino un asset. La pantalla lo traduce a un texto. */

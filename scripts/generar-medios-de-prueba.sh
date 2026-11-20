@@ -25,6 +25,9 @@ mkdir -p "$OUT"
 "$FFMPEG" "${Q[@]}" -f lavfi -i sine=frequency=660:sample_rate=48000 -t 3 -c:a libopus -b:a 24k "$OUT/audio-opus.webm"
 # MP3.
 "$FFMPEG" "${Q[@]}" -f lavfi -i sine=frequency=770:sample_rate=44100 -t 3 -c:a libmp3lame -b:a 64k "$OUT/tono.mp3"
+# Para la mezcla: un fondo de 10 s como el audio extraído de un video y una voz de 6 s como una grabación (los dos AAC en M4A).
+"$FFMPEG" "${Q[@]}" -f lavfi -i sine=frequency=220:sample_rate=44100 -t 10 -c:a aac -b:a 48k "$OUT/fondo-10s.m4a"
+"$FFMPEG" "${Q[@]}" -f lavfi -i sine=frequency=880:sample_rate=44100 -t 6 -c:a aac -b:a 48k "$OUT/voz-6s.m4a"
 # Imágenes.
 "$FFMPEG" "${Q[@]}" -f lavfi -i "color=c=0xb6f23c:size=320x240" -frames:v 1 "$OUT/imagen.png"
 "$FFMPEG" "${Q[@]}" -f lavfi -i "color=c=0x2b2b28:size=320x240" -frames:v 1 -q:v 4 "$OUT/imagen.jpg"

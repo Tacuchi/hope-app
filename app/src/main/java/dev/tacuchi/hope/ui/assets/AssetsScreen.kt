@@ -50,7 +50,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +61,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.tacuchi.hope.R
 import dev.tacuchi.hope.data.Asset
+import dev.tacuchi.hope.data.AssetNameKind
 import dev.tacuchi.hope.data.AssetOrigin
+import dev.tacuchi.hope.data.AssetUse
 import dev.tacuchi.hope.data.AssetType
 
 /** Ancho máximo del contenido: en horizontal deja libre la esquina del botón «Importar». */
@@ -75,6 +79,8 @@ private val FabSideSpace = 176.dp
 fun AssetsScreen(
     onBack: () -> Unit,
     onImport: (uri: Uri, origin: AssetOrigin) -> Unit,
+    onUseInNewHope: (Asset) -> Unit,
+    onOpenHope: (Long) -> Unit,
     viewModel: AssetsViewModel = viewModel(factory = AssetsViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -90,6 +96,8 @@ fun AssetsScreen(
         onSelectFilter = viewModel::selectFilter,
         onTogglePlay = viewModel::togglePlay,
         onDelete = viewModel::delete,
+        onUseInNewHope = onUseInNewHope,
+        onUseInHope = { asset, hopeId -> viewModel.useInHope(asset, hopeId, onOpenHope) },
         onImportVisual = {
             pickVisual.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         },
@@ -105,10 +113,13 @@ fun AssetsContent(
     onSelectFilter: (AssetFilter) -> Unit,
     onTogglePlay: (Asset) -> Unit,
     onDelete: (Asset) -> Unit,
+    onUseInNewHope: (Asset) -> Unit,
+    onUseInHope: (asset: Asset, hopeId: Long) -> Unit,
     onImportVisual: () -> Unit,
     onImportAudio: () -> Unit,
 ) {
     var toDelete by remember { mutableStateOf<Asset?>(null) }
+    var toPlace by remember { mutableStateOf<Asset?>(null) }
 
     Scaffold(
         topBar = {
@@ -145,8 +156,12 @@ fun AssetsContent(
                     AssetList(
                         assets = assets,
                         playingId = state.playingId,
+                        uses = state.uses,
+                        canUseInExisting = state.hopes.isNotEmpty(),
                         onTogglePlay = onTogglePlay,
                         onAskDelete = { toDelete = it },
+                        onUseInNewHope = onUseInNewHope,
+                        onAskUseInHope = { toPlace = it },
                         modifier = Modifier
                             .widthIn(max = ContentMaxWidth)
                             .fillMaxSize()
@@ -157,8 +172,57 @@ fun AssetsContent(
         }
     }
 
+    toPlace?.let { asset ->
+        AlertDialog(
+            onDismissRequest = { toPlace = null },
+            title = { Text(stringResource(R.string.assets_choose_hope_title, assetName(asset))) },
+            text = {
+                LazyColumn {
+                    items(state.hopes, key = { it.id }) { hope ->
+                        ListItem(
+                            headlineContent = { Text(hope.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.clickable {
+                                toPlace = null
+                                onUseInHope(asset, hope.id)
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { toPlace = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
     toDelete?.let { asset ->
         val name = assetName(asset)
+        val usedBy = state.uses[asset.id].orEmpty()
+        if (usedBy.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { toDelete = null },
+                icon = { Icon(painterResource(R.drawable.ic_info), contentDescription = null) },
+                title = { Text(stringResource(R.string.assets_in_use_title, name)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(pluralStringResource(R.plurals.assets_in_use_body, usedBy.size, usedBy.size))
+                        usedBy.forEach { use ->
+                            Text(
+                                stringResource(R.string.assets_in_use_item, use.title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.action_accept)) }
+                },
+            )
+            return@let
+        }
         AlertDialog(
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.assets_delete_title, name)) },
@@ -180,8 +244,12 @@ fun AssetsContent(
 private fun AssetList(
     assets: List<Asset>,
     playingId: Long?,
+    uses: Map<Long, List<AssetUse>>,
+    canUseInExisting: Boolean,
     onTogglePlay: (Asset) -> Unit,
     onAskDelete: (Asset) -> Unit,
+    onUseInNewHope: (Asset) -> Unit,
+    onAskUseInHope: (Asset) -> Unit,
     modifier: Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -200,8 +268,12 @@ private fun AssetList(
             AssetRow(
                 asset = asset,
                 playing = asset.id == playingId,
+                useCount = uses[asset.id]?.size ?: 0,
+                canUseInExisting = canUseInExisting,
                 onTogglePlay = { onTogglePlay(asset) },
                 onDelete = { onAskDelete(asset) },
+                onUseInNewHope = { onUseInNewHope(asset) },
+                onUseInHope = { onAskUseInHope(asset) },
             )
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         }
@@ -287,8 +359,12 @@ private fun EmptyState(filtered: Boolean) {
 private fun AssetRow(
     asset: Asset,
     playing: Boolean,
+    useCount: Int,
+    canUseInExisting: Boolean,
     onTogglePlay: () -> Unit,
     onDelete: () -> Unit,
+    onUseInNewHope: () -> Unit,
+    onUseInHope: () -> Unit,
 ) {
     val name = assetName(asset)
     val clickModifier = if (asset.type == AssetType.Audio) {
@@ -300,26 +376,36 @@ private fun AssetRow(
     ListItem(
         modifier = clickModifier,
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-        leadingContent = { AssetTile(asset.type, playing) },
+        leadingContent = { AssetTile(asset, playing) },
         supportingContent = {
-            Text(
-                assetSubtitle(asset),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column {
+                Text(
+                    assetSubtitle(asset),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (useCount > 0) {
+                    Text(
+                        pluralStringResource(R.plurals.assets_in_use, useCount, useCount),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
         },
-        trailingContent = { AssetMenu(name, onDelete) },
+        trailingContent = { AssetMenu(name, canUseInExisting, onDelete, onUseInNewHope, onUseInHope) },
     ) {
         Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun AssetTile(type: AssetType, playing: Boolean) {
+private fun AssetTile(asset: Asset, playing: Boolean) {
     val icon = when {
         playing -> R.drawable.ic_pause
-        type == AssetType.Audio -> R.drawable.ic_music_note
+        asset.nameKind == AssetNameKind.Recording -> R.drawable.ic_mic
+        asset.type == AssetType.Audio -> R.drawable.ic_music_note
         else -> R.drawable.ic_image
     }
     val colors = MaterialTheme.colorScheme
@@ -341,7 +427,13 @@ private fun AssetTile(type: AssetType, playing: Boolean) {
 }
 
 @Composable
-private fun AssetMenu(name: String, onDelete: () -> Unit) {
+private fun AssetMenu(
+    name: String,
+    canUseInExisting: Boolean,
+    onDelete: () -> Unit,
+    onUseInNewHope: () -> Unit,
+    onUseInHope: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -351,18 +443,23 @@ private fun AssetMenu(name: String, onDelete: () -> Unit) {
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            // Las hopes llegan en una fase posterior: estas acciones se ven, deshabilitadas.
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.assets_use_new_hope)) },
                 leadingIcon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-                onClick = {},
-                enabled = false,
+                onClick = {
+                    expanded = false
+                    onUseInNewHope()
+                },
             )
+            // Sin hopes guardadas no hay dónde ponerlo.
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.assets_use_existing_hope)) },
                 leadingIcon = { Icon(painterResource(R.drawable.ic_bookmark_add), contentDescription = null) },
-                onClick = {},
-                enabled = false,
+                onClick = {
+                    expanded = false
+                    onUseInHope()
+                },
+                enabled = canUseInExisting,
             )
             HorizontalDivider()
             DropdownMenuItem(

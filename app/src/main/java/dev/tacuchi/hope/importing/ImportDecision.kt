@@ -1,5 +1,7 @@
 package dev.tacuchi.hope.importing
 
+import dev.tacuchi.hope.data.AssetNameKind
+
 /** Lo que se sabe de un archivo después de abrirlo. */
 data class MediaInspection(
     val isImage: Boolean,
@@ -54,4 +56,14 @@ fun receivedFormatLabel(displayName: String?, declaredMime: String?): String? {
         extension != null -> extension.uppercase()
         else -> declaredMime
     }
+}
+
+/**
+ * Cómo nombrar un audio importado: «Nota de voz» solo si es OGG u Opus, como las notas de voz de
+ * WhatsApp; cualquier otro es «Audio».
+ */
+fun audioNameKind(extension: String, mime: String?): AssetNameKind {
+    val oggOrOpus = extension.lowercase() in setOf("ogg", "oga", "opus") ||
+        mime?.lowercase() in setOf("audio/ogg", "audio/opus", "application/ogg")
+    return if (oggOrOpus) AssetNameKind.VoiceNote else AssetNameKind.Audio
 }

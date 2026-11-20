@@ -16,6 +16,12 @@ interface AssetDao {
     @Query("SELECT MAX(number) FROM assets WHERE nameKind = :kind")
     suspend fun maxNumber(kind: AssetNameKind): Int?
 
+    @Query("SELECT * FROM assets WHERE id IN (:ids)")
+    suspend fun getAll(ids: List<Long>): List<Asset>
+
+    @Query("SELECT * FROM assets WHERE id = :id")
+    suspend fun get(id: Long): Asset?
+
     @Insert
     suspend fun insert(asset: Asset): Long
 

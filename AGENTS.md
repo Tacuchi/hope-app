@@ -16,7 +16,7 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 | Compose BOM | 2026.11.01 (Material 3 1.5.0) |
 | Navigation 3 | 1.2.2 |
 | Activity Compose | 1.13.0 |
-| Lifecycle | 2.11.1 |
+| Lifecycle (runtime, ViewModel, ViewModel para Navigation 3) | 2.11.1 |
 | Core KTX | 1.19.1 |
 | Core SplashScreen | 1.2.0 |
 | kotlinx-serialization | 1.13.0 |
@@ -36,14 +36,19 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 
 - Un solo módulo `app`, paquete `dev.tacuchi.hope`.
 - Una sola actividad (`MainActivity`) con la API de pantalla de inicio y `enableEdgeToEdge()`. Todo se dibuja en Compose.
-- Navegación con Navigation 3: rutas `@Serializable` que implementan `NavKey` en `navigation/HopeNavigation.kt`, pila con `rememberNavBackStack`.
+- Navegación con Navigation 3: rutas `@Serializable` que implementan `NavKey` en `navigation/HopeNavigation.kt`, pila con `rememberNavBackStack`. Cada destino tiene sus ViewModels (`rememberViewModelStoreNavEntryDecorator`): se limpian al salir de la pila.
 - Pantallas en `ui/<pantalla>/`. Cada una recibe callbacks de navegación, nunca la pila.
 - Estado: cuando una pantalla tiene datos, un `ViewModel` expone `StateFlow` y la pantalla lo lee con `collectAsStateWithLifecycle()`. La parte visual sin estado (`AssetsContent`) se prueba sola.
-- Inyección manual: `HopeApplication` crea un `AppContainer` con la base, el repositorio y los servicios de importación; cada ViewModel tiene su `Factory`. Con un solo módulo, Hilt sumaría plugin y anotaciones sin beneficio.
-- Datos (`data/`): Room guarda el catálogo de assets; los archivos viven en `filesDir/assets/`. El nombre visible se arma con el tipo y el número (o el momento del fotograma), no se guarda. El esquema se exporta a `app/schemas/`.
+- Inyección manual: `HopeApplication` crea un `AppContainer` con la base, los repositorios, los servicios de importación, el reproductor de mezcla y el grabador; cada ViewModel tiene su `Factory`. Con un solo módulo, Hilt sumaría plugin y anotaciones sin beneficio.
+- Datos (`data/`): Room guarda el catálogo de assets y las hopes; los archivos viven en `filesDir/assets/`. El nombre visible se arma con el tipo y el número (o el momento del fotograma), no se guarda. «Nota de voz» es solo para OGG u Opus; el resto de los audios importados es «Audio». El esquema se exporta a `app/schemas/`.
+- Hopes: guardan qué assets usan (portada, fondo, voz) y sus ajustes (volumen por pista, recorte del fondo, desfase de la voz). La mezcla no se graba: ocurre al reproducir. Las referencias a assets son claves foráneas `RESTRICT`: un asset en uso no se borra, y Assets muestra qué hopes lo usan. Borrar una hope no borra sus assets.
+- Migraciones: automáticas (`AutoMigration`) mientras solo sumen tablas o columnas, nunca destructivas. Cada versión nueva se prueba abriendo una base de la anterior con assets (`HopeRepositoryTest`).
+- Mezcla (`playback/MixPlayer`): un solo reproductor para el editor y la biblioteca, en el contenedor. Es un `CompositionPlayer` de Media3 con dos secuencias que se mezclan en una sola salida de audio: el fondo recortado y la voz detrás de un silencio del largo de su desfase. Por salir juntas no se desfasan (con dos ExoPlayer la voz llegaba con 230 a 320 ms de atraso). El volumen de cada pista es un `GainProcessor` que se ajusta en vivo. La duración de una hope va del inicio del recorte al final de la última pista. Solo suena con la app a la vista: `MainActivity.onStop` lo pausa.
+- Grabación (`recording/`): `MediaRecorder` en AAC dentro de M4A a `filesDir/recording-tmp/`. «Listo» crea el asset «Grabación N»; descartar borra el temporal. El permiso de micrófono se pide al tocar Grabar. Con audífonos (cable, USB, Bluetooth A2DP o LE, según `AudioManager.getDevices`) el fondo suena mientras se graba; por el altavoz se graba en silencio, con un aviso.
 - Importación (`importing/`): todo lo recibido se copia primero a `filesDir/import-tmp/<sesión>/`, se inspecciona por su contenido (no por la extensión) y solo al confirmar pasa a ser asset. Cancelar o fallar borra la sesión.
-- Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` con `@OptIn(UnstableApi::class)`.
+- Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` y `MixPlayer`, con `@OptIn(UnstableApi::class)`.
 - Compartir: `MainActivity` es `singleTask` y recibe `ACTION_SEND` de video, audio e imagen en `onCreate` y `onNewIntent`. El origen sale del referrer con una tabla de apps conocidas; si no, «Compartido».
+- Al terminar, una importación va adonde la pidieron (`ImportPurpose`): desde Assets, a Assets; compartida, a Nueva hope con el audio y la portada; desde el editor, de vuelta al editor. Cancelar en «Elegir portada» guarda igual el audio extraído.
 
 ## Tema y diseño
 
@@ -63,7 +68,7 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 ## Pruebas
 
 - Unitarias en `app/src/test`. Las de interfaz y las de Room (base en memoria) corren con Robolectric dentro de `testDebugUnitTest`, sin emulador.
-- Instrumentadas en `app/src/androidTest`: inspección de archivos reales y extracción con Media3. Necesitan emulador: `./gradlew connectedDebugAndroidTest`. No corren en CI.
+- Instrumentadas en `app/src/androidTest`: inspección de archivos reales, extracción con Media3 y la mezcla (`MixPlayerTest` mide el nivel de la salida mezclada: la voz entra a su desfase con ±100 ms y el fondo baja a su volumen). Necesitan emulador: `./gradlew connectedDebugAndroidTest`. No corren en CI.
 - Los archivos de prueba son sintéticos (tonos y colores). Se regeneran con `scripts/generar-medios-de-prueba.sh`; con una carpeta como argumento genera además los grandes (60 s y 11 min) para probar en el emulador, que no van al repo.
 - `ui/theme/ContrastTest.kt` mide el contraste WCAG de los pares de roles usados: texto 4,5:1, íconos y bordes 3:1.
 - `navigation/NavigationTest.kt` recorre los destinos, vuelve con Atrás y comprueba que la pila sobrevive a recrear la actividad.
@@ -79,6 +84,8 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 Gradle necesita el SDK: `ANDROID_HOME` o `local.properties` con `sdk.dir`.
 
 ## Probar en el emulador
+
+El emulador necesita micrófono del host para grabar (`hw.audioInput=yes` en el `config.ini` del AVD). Los audífonos no se pueden conectar: la decisión de si suena el fondo se cubre con pruebas unitarias.
 
 Con Android CLI (`android`, agregar `--no-metrics`):
 

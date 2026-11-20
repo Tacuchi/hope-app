@@ -1,5 +1,6 @@
 package dev.tacuchi.hope.importing
 
+import dev.tacuchi.hope.data.AssetNameKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,5 +42,15 @@ class ImportDecisionTest {
         assertEquals("DOCX", receivedFormatLabel("informe.docx", null))
         assertEquals("application/zip", receivedFormatLabel("sin-extension", "application/zip"))
         assertEquals(null, receivedFormatLabel(null, null))
+    }
+
+    @Test
+    fun onlyOggOrOpusAudiosAreVoiceNotes() {
+        assertEquals(AssetNameKind.VoiceNote, audioNameKind("ogg", "audio/ogg"))
+        assertEquals(AssetNameKind.VoiceNote, audioNameKind("opus", null))
+        assertEquals(AssetNameKind.VoiceNote, audioNameKind("", "audio/ogg"))
+        assertEquals(AssetNameKind.Audio, audioNameKind("mp3", "audio/mpeg"))
+        assertEquals(AssetNameKind.Audio, audioNameKind("m4a", "audio/mp4"))
+        assertEquals(AssetNameKind.Audio, audioNameKind("webm", "audio/webm"))
     }
 }

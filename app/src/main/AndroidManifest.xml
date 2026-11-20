@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Grabar la voz en el editor. Se pide en el momento de grabar, nunca al abrir. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:name=".HopeApplication"
         android:icon="@mipmap/ic_launcher"

@@ -14,13 +14,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** «Audio de video 1», «Nota de voz 2», «Imagen 3» o «Fotograma 0:14». */
+/** «Audio de video 1», «Nota de voz 2», «Audio 3», «Grabación 1», «Imagen 3» o «Fotograma 0:14». */
 @Composable
 fun assetName(asset: Asset): String = when (asset.nameKind) {
     AssetNameKind.Frame -> stringResource(R.string.asset_name_frame, formatDuration(asset.frameMs ?: 0L))
     AssetNameKind.AudioFromVideo -> stringResource(R.string.asset_name_audio_from_video, asset.number ?: 0)
     AssetNameKind.VoiceNote -> stringResource(R.string.asset_name_voice_note, asset.number ?: 0)
     AssetNameKind.Image -> stringResource(R.string.asset_name_image, asset.number ?: 0)
+    AssetNameKind.Audio -> stringResource(R.string.asset_name_audio, asset.number ?: 0)
+    AssetNameKind.Recording -> stringResource(R.string.asset_name_recording, asset.number ?: 0)
 }
 
 /** «Audio · WhatsApp · 18 nov · 0:52»: tipo, origen, fecha y, en audios, duración. */
