@@ -22,7 +22,11 @@ import dev.tacuchi.hope.R
 import dev.tacuchi.hope.appContainer
 import dev.tacuchi.hope.data.Palette
 import dev.tacuchi.hope.data.ThemeMode
+import dev.tacuchi.hope.ui.common.openLink
 import dev.tacuchi.hope.ui.theme.fixedScheme
+
+/** La política de privacidad, publicada con GitHub Pages desde `docs/privacidad/` del repo. */
+const val PRIVACY_POLICY_URL = "https://tacuchi.github.io/hope-app/privacidad/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +88,10 @@ fun SettingsScreen(onBack: () -> Unit, onLicenses: () -> Unit) {
             Text(stringResource(R.string.about), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.app_version, BuildConfig.VERSION_NAME))
             TextButton(onClick = onLicenses) { Text(stringResource(R.string.licenses)) }
+            val context = LocalContext.current
+            TextButton(onClick = { openLink(context, PRIVACY_POLICY_URL) }) {
+                Text(stringResource(R.string.privacy_policy))
+            }
         }
     }
 }

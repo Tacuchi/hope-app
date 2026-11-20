@@ -2,7 +2,7 @@
 
 App Android para armar *hopes*: audio que da ánimo, una portada y la voz de la persona encima. Todo vive en el teléfono: sin login ni servidor. La red se usa solo para la vista previa de un enlace (ver «Enlaces»).
 
-Specs, planes y diseño viven en el hub `personal-lab/projects/hope-app`, no en este repo.
+Specs, planes y diseño se gestionan fuera de este repo.
 
 ## Versiones fijadas
 
