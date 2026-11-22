@@ -19,8 +19,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import dev.tacuchi.hope.importing.OriginResolver
-import dev.tacuchi.hope.links.Links
+import dev.tacuchi.hope.domain.model.OriginResolver
+import dev.tacuchi.hope.domain.model.Links
 import dev.tacuchi.hope.navigation.HopeNavigation
 import dev.tacuchi.hope.ui.importing.ImportPurpose
 import dev.tacuchi.hope.ui.importing.ImportViewModel

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Genera los archivos de prueba sintéticos (tonos y colores, sin material ajeno).
-#   scripts/generar-medios-de-prueba.sh            -> los pequeños, en app/src/androidTest/assets/media
+#   scripts/generar-medios-de-prueba.sh            -> los pequeños, en core/media/src/androidTest/assets/media
 #   scripts/generar-medios-de-prueba.sh <carpeta>  -> además los grandes para el emulador (no van al repo):
 #                                                     un video de 60 s y uno de más de 10 minutos.
 set -euo pipefail
 FFMPEG="${FFMPEG:-ffmpeg}"
 Q=(-hide_banner -loglevel error -y)
 cd "$(dirname "$0")/.."
-OUT=app/src/androidTest/assets/media
+OUT=core/media/src/androidTest/assets/media
 mkdir -p "$OUT"
 
 # Video con audio AAC, como uno de WhatsApp o TikTok.

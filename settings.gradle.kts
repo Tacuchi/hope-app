@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -22,3 +23,13 @@ dependencyResolutionManagement {
 
 rootProject.name = "hope"
 include(":app")
+include(":core:domain")
+include(":core:data")
+include(":core:media")
+include(":core:ui")
+include(":feature:library")
+include(":feature:assets")
+include(":feature:editor")
+include(":feature:importing")
+include(":feature:search")
+include(":feature:settings")

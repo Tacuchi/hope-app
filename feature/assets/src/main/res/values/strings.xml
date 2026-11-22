@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assets_title">Assets</string>
+    <string name="assets_filter_all">Todos</string>
+    <string name="assets_empty_title">Aún no tienes assets</string>
+    <string name="assets_empty_body">Los audios y las imágenes que importes o extraigas de un video aparecen aquí.</string>
+    <string name="assets_empty_filtered">No hay assets de este tipo.</string>
+    <string name="assets_import_visual">Foto o video</string>
+    <string name="assets_import_audio">Archivo de audio</string>
+    <string name="assets_more">Más opciones de %1$s</string>
+    <string name="assets_play">Escuchar %1$s</string>
+    <string name="assets_pause">Pausar %1$s</string>
+    <string name="assets_use_new_hope">Usar en una hope nueva</string>
+    <string name="assets_use_existing_hope">Usar en una hope existente</string>
+    <string name="assets_delete">Borrar</string>
+    <string name="assets_delete_title">¿Borrar «%1$s»?</string>
+    <string name="assets_delete_body">Se quita de Assets y se libera su espacio en el teléfono.</string>
+    <plurals name="assets_in_use">
+        <item quantity="one">En uso en %1$d hope</item>
+        <item quantity="other">En uso en %1$d hopes</item>
+    </plurals>
+    <string name="assets_in_use_title">«%1$s» está en uso</string>
+    <plurals name="assets_in_use_body">
+        <item quantity="one">No se puede borrar mientras lo use esta hope:</item>
+        <item quantity="other">No se puede borrar mientras lo usen estas %1$d hopes:</item>
+    </plurals>
+    <string name="assets_in_use_item">• %1$s</string>
+    <string name="assets_choose_hope_title">¿En qué hope pones «%1$s»?</string>
+</resources>

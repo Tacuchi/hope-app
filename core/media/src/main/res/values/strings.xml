@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notificación de reproducción -->
+    <string name="playback_untitled">Nueva hope</string>
+    <string name="playback_close">Cerrar</string>
+</resources>

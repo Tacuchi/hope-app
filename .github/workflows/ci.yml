@@ -41,7 +41,7 @@ jobs:
           fi
 
       - name: Compilar, Lint y pruebas
-        run: ./gradlew assembleDebug lintDebug testDebugUnitTest
+        run: ./gradlew assembleDebug lintDebug testDebugUnitTest :core:domain:test
 
       - name: Guardar reportes
         if: failure()
@@ -49,5 +49,5 @@ jobs:
         with:
           name: reportes
           path: |
-            app/build/reports/
-            app/build/test-results/
+            **/build/reports/
+            **/build/test-results/

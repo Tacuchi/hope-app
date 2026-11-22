@@ -4,17 +4,26 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tacuchi.hope.testing.waitUntil
+import dev.tacuchi.hope.ui.editor.R as EditorR
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class SharedIntentTest {
+
+    @get:Rule
+    val compose = createEmptyComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -44,6 +53,21 @@ class SharedIntentTest {
                 Thread.sleep(5)
             }
 
+            assertEquals(1, importedFiles())
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun aSharedImageOpensANewHopeWithItAsCover() {
+        val intent = Intent(context, MainActivity::class.java)
+            .setAction(Intent.ACTION_SEND)
+            .setType("image/png")
+            .putExtra(Intent.EXTRA_STREAM, sharedImage())
+
+        ActivityScenario.launch<MainActivity>(intent).use {
+            compose.waitUntilExactlyOneExists(hasText(context.getString(EditorR.string.editor_change_cover)), timeoutMillis = 5_000)
+            compose.onNodeWithText(context.getString(EditorR.string.editor_title)).assertExists()
             assertEquals(1, importedFiles())
         }
     }

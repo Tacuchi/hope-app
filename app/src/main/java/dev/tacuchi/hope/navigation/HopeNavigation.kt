@@ -14,8 +14,10 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import dev.tacuchi.hope.data.Asset
-import dev.tacuchi.hope.data.AssetType
+import dev.tacuchi.hope.BuildConfig
+import dev.tacuchi.hope.R
+import dev.tacuchi.hope.domain.model.Asset
+import dev.tacuchi.hope.domain.model.AssetType
 import dev.tacuchi.hope.ui.assets.AssetsScreen
 import dev.tacuchi.hope.ui.editor.EditorArgs
 import dev.tacuchi.hope.ui.editor.EditorImport
@@ -141,9 +143,10 @@ fun HopeNavigation(
                     onPaletteChange = settingsViewModel::setPalette,
                     onBack = dropUnlessResumed(block = goBack),
                     onLicenses = dropUnlessResumed { backStack.add(LicensesRoute) },
+                    versionName = BuildConfig.VERSION_NAME,
                 )
             }
-            entry<LicensesRoute> { LicensesScreen(dropUnlessResumed(block = goBack)) }
+            entry<LicensesRoute> { LicensesScreen(R.raw.aboutlibraries, dropUnlessResumed(block = goBack)) }
             entry<SearchRoute> { SearchScreen(onBack = dropUnlessResumed(block = goBack)) }
             entry<AssetsRoute> {
                 AssetsScreen(

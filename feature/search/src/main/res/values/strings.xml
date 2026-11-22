@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_title">Buscar en redes</string>
+    <string name="search_intro">Busca videos que te den ánimo. Se abre la búsqueda de “hopecore” en la red que elijas.</string>
+    <string name="search_term">hopecore</string>
+    <string name="search_tiktok">TikTok</string>
+    <string name="search_tiktok_hint">Buscar #hopecore</string>
+    <string name="search_youtube">YouTube</string>
+    <string name="search_youtube_hint">Buscar hopecore</string>
+    <string name="search_instagram">Instagram</string>
+    <string name="search_instagram_hint">Explorar #hopecore</string>
+    <string name="search_found_title">¿Encontraste uno?</string>
+    <string name="search_found_body">Guárdalo en la app de la red o ábrelo en WhatsApp, toca Compartir y elige Hope.</string>
+</resources>

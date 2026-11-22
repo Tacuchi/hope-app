@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hope</string>
+    <string name="action_back">Volver</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_continue">Seguir</string>
+    <string name="action_accept">Aceptar</string>
+    <string name="settings">Ajustes</string>
+    <string name="assets_import">Importar</string>
+    <string name="link_network_tiktok">TikTok</string>
+    <string name="link_network_youtube">YouTube</string>
+    <string name="link_network_instagram">Instagram</string>
+    <string name="link_network_generic">Enlace</string>
+    <string name="link_open_failed">No hay una app para abrir este enlace.</string>
+    <string name="assets_filter_audio">Audio</string>
+    <string name="assets_filter_image">Imagen</string>
+    <string name="assets_subtitle_separator">" · "</string>
+    <string name="asset_name_audio_from_video">Audio de video %1$d</string>
+    <string name="asset_name_voice_note">Nota de voz %1$d</string>
+    <string name="asset_name_image">Imagen %1$d</string>
+    <string name="asset_name_frame">Fotograma %1$s</string>
+    <string name="asset_name_audio">Audio %1$d</string>
+    <string name="asset_name_recording">Grabación %1$d</string>
+    <string name="origin_whatsapp">WhatsApp</string>
+    <string name="origin_telegram">Telegram</string>
+    <string name="origin_tiktok">TikTok</string>
+    <string name="origin_gallery">Galería</string>
+    <string name="origin_files">Archivos</string>
+    <string name="origin_shared">Compartido</string>
+    <string name="origin_recording">Grabación</string>
+</resources>
