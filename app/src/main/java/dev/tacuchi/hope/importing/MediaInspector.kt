@@ -8,10 +8,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Abre el archivo copiado y mira qué es de verdad, sin fiarse de la extensión ni del tipo. */
-class MediaInspector {
+/**
+ * Abre el archivo copiado y mira qué es de verdad, sin fiarse de la extensión ni del tipo.
+ * Abierta para que las pruebas de los ViewModels la reemplacen sin leer medios reales.
+ */
+open class MediaInspector {
 
-    suspend fun inspect(file: File): MediaInspection = withContext(Dispatchers.IO) {
+    open suspend fun inspect(file: File): MediaInspection = withContext(Dispatchers.IO) {
         if (isImage(file)) {
             return@withContext MediaInspection(isImage = true, hasVideo = false, hasAudio = false, durationMs = null)
         }

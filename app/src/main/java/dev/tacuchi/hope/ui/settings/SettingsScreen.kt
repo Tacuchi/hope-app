@@ -14,12 +14,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 import dev.tacuchi.hope.BuildConfig
 import dev.tacuchi.hope.R
-import dev.tacuchi.hope.appContainer
+import dev.tacuchi.hope.data.Appearance
 import dev.tacuchi.hope.data.Palette
 import dev.tacuchi.hope.data.ThemeMode
 import dev.tacuchi.hope.ui.common.openLink
@@ -47,9 +46,13 @@ fun LicensesScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onLicenses: () -> Unit) {
-    val repository = LocalContext.current.appContainer.appearanceRepository
-    val appearance by repository.appearance.collectAsStateWithLifecycle()
+fun SettingsScreen(
+    appearance: Appearance,
+    onThemeChange: (ThemeMode) -> Unit,
+    onPaletteChange: (Palette) -> Unit,
+    onBack: () -> Unit,
+    onLicenses: () -> Unit,
+) {
     Scaffold(topBar = { SettingsBar(R.string.settings, onBack) }) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -57,7 +60,7 @@ fun SettingsScreen(onBack: () -> Unit, onLicenses: () -> Unit) {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 ThemeMode.entries.forEachIndexed { index, theme ->
                     SegmentedButton(selected = theme == appearance.theme,
-                        onClick = { repository.save(appearance.copy(theme = theme)) },
+                        onClick = { onThemeChange(theme) },
                         shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size)) {
                         Text(stringResource(when (theme) {
                             ThemeMode.System -> R.string.theme_system
@@ -73,7 +76,7 @@ fun SettingsScreen(onBack: () -> Unit, onLicenses: () -> Unit) {
                     val color = if (palette == Palette.Dynamic && Build.VERSION.SDK_INT >= 31)
                         dynamicLightColorScheme(LocalContext.current).primary else fixedScheme(palette, false).primary
                     FilterChip(selected = palette == appearance.palette,
-                        onClick = { repository.save(appearance.copy(palette = palette)) },
+                        onClick = { onPaletteChange(palette) },
                         leadingIcon = { Box(Modifier.size(18.dp).background(color, CircleShape)) },
                         label = { Text(stringResource(when (palette) {
                             Palette.Hope -> R.string.app_name

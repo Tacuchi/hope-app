@@ -1,11 +1,8 @@
 package dev.tacuchi.hope
 
 import android.app.Application
-import android.content.Context
+import dagger.hilt.android.HiltAndroidApp
 
-class HopeApplication : Application() {
-    val container: AppContainer by lazy { AppContainer(this) }
-}
-
-val Context.appContainer: AppContainer
-    get() = (applicationContext as HopeApplication).container
+/** Raíz del grafo de Hilt: las dependencias de la app se declaran en `di/`. */
+@HiltAndroidApp
+class HopeApplication : Application()

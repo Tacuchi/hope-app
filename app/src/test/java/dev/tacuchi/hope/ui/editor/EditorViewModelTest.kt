@@ -123,6 +123,34 @@ class EditorViewModelTest {
     private fun savedHopes() = runBlocking { hopes.observe().first() }
 
     @Test
+    fun theCatalogArrivesInTheSameStateAndTellsLoadingFromEmpty() {
+        val vm = EditorViewModel(
+            args = EditorArgs(),
+            hopes = hopes,
+            assets = assets,
+            player = MixPlayer(ApplicationProvider.getApplicationContext()),
+            recorder = VoiceRecorder(FakeCapture(), recordingDir),
+            inspector = MediaInspector(),
+            headphonesConnected = { false },
+            previews = previews,
+        )
+        // Antes de leer la base: cargando, no vacío.
+        assertNull(vm.state.value.catalog)
+
+        collectors += CoroutineScope(Dispatchers.Main.immediate).launch { vm.state.collect {} }
+        waitUntil { vm.state.value.catalog != null }
+        assertEquals(emptyList<PickableAsset>(), vm.now.catalog)
+
+        val frame = add(AssetNameKind.Frame)
+        waitUntil { vm.state.value.catalog?.size == 1 }
+        assertEquals(PickableAsset(frame, assets.fileOf(frame)), vm.now.catalog!!.single())
+        // El borrador sigue en el mismo estado mientras cambia el catálogo.
+        vm.setTitle("Respira")
+        assertEquals("Respira", vm.now.draft.title)
+        assertEquals(1, vm.now.catalog!!.size)
+    }
+
+    @Test
     fun savingNeedsATitleAndAtLeastOneTrack() {
         val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
         val vm = viewModel()

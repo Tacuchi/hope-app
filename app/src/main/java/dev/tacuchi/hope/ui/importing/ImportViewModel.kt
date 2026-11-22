@@ -6,11 +6,8 @@ import android.net.Uri
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import dev.tacuchi.hope.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetNameKind
 import dev.tacuchi.hope.data.AssetOrigin
@@ -36,7 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import javax.inject.Inject
 
 /** Un fotograma sugerido en «Elegir portada». */
 data class SuggestedFrame(val positionMs: Long, val thumbnail: Bitmap?)
@@ -81,7 +78,8 @@ sealed interface ImportState {
  * Una importación de punta a punta: copia, inspección, avisos, extracción y portada. Los assets
  * se escriben solo al final; cancelar en cualquier paso borra la carpeta temporal de la sesión.
  */
-class ImportViewModel(
+@HiltViewModel
+class ImportViewModel @Inject constructor(
     private val staging: ImportStaging,
     private val inspector: MediaInspector,
     private val extractor: AudioExtractor,
@@ -375,17 +373,5 @@ class ImportViewModel(
         private const val THUMBNAIL_SIDE = 192
         private const val PREVIEW_DEBOUNCE_MS = 120L
         private const val JPEG_QUALITY = 90
-
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = this[APPLICATION_KEY]!!.appContainer
-                ImportViewModel(
-                    container.staging,
-                    container.inspector,
-                    container.audioExtractor,
-                    container.assetRepository,
-                )
-            }
-        }
     }
 }

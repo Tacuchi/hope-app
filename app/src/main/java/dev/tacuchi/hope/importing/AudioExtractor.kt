@@ -26,17 +26,18 @@ import java.io.File
  * sin recodificar; si entra otro códec (Opus, por ejemplo) lo convierte.
  *
  * Transformer está marcado como API inestable en Media3 1.11: puede cambiar entre versiones, así
- * que su uso queda encerrado en esta clase.
+ * que su uso queda encerrado en esta clase. Abierta para que las pruebas de los ViewModels la
+ * reemplacen sin Media3.
  */
 @OptIn(UnstableApi::class)
-class AudioExtractor(private val context: Context) {
+open class AudioExtractor(private val context: Context) {
 
     /**
      * Extrae el audio de [input] en [output] e informa el avance de 0 a 100 (nulo si aún no se
      * sabe). Devuelve la duración del audio en milisegundos. Cancelar la corrutina detiene la
      * extracción y borra [output].
      */
-    suspend fun extract(input: File, output: File, onProgress: (Int?) -> Unit = {}): Long =
+    open suspend fun extract(input: File, output: File, onProgress: (Int?) -> Unit = {}): Long =
         withContext(Dispatchers.Main.immediate) {
             val started = SystemClock.elapsedRealtime()
             val result = CompletableDeferred<ExportResult>()

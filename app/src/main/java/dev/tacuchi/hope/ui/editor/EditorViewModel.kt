@@ -3,12 +3,11 @@ package dev.tacuchi.hope.ui.editor
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import dev.tacuchi.hope.appContainer
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetNameKind
 import dev.tacuchi.hope.data.AssetOrigin
@@ -17,16 +16,16 @@ import dev.tacuchi.hope.data.AssetType
 import dev.tacuchi.hope.data.Hope
 import dev.tacuchi.hope.data.HopeRepository
 import dev.tacuchi.hope.data.NewAsset
+import dev.tacuchi.hope.di.HeadphonesConnected
 import dev.tacuchi.hope.importing.MediaInspector
 import dev.tacuchi.hope.links.Link
 import dev.tacuchi.hope.links.LinkPreview
 import dev.tacuchi.hope.links.LinkPreviews
 import dev.tacuchi.hope.links.Links
+import dev.tacuchi.hope.playback.HopePlayer
 import dev.tacuchi.hope.playback.MixPlayback
-import dev.tacuchi.hope.playback.MixPlayer
 import dev.tacuchi.hope.playback.MixPresentation
 import dev.tacuchi.hope.playback.MixSpec
-import dev.tacuchi.hope.recording.AudioOutputs
 import dev.tacuchi.hope.recording.VoiceRecorder
 import dev.tacuchi.hope.recording.backgroundPlaysWhileRecording
 import kotlinx.coroutines.CancellationException
@@ -108,24 +107,33 @@ data class EditorUiState(
     val micDenied: Boolean = false,
     val recordingFailed: Boolean = false,
     val saved: Boolean = false,
+    /** El catálogo para la hoja de elegir; nulo mientras se lee, vacío si no hay assets. */
+    val catalog: List<PickableAsset>? = null,
 )
 
 enum class EditorPlayback { Idle, Mix, Background }
 
 /**
- * El editor de una hope nueva o guardada. Escuchar usa el mismo [MixPlayer] que la biblioteca
- * con los mismos ajustes, así lo que se oye aquí es lo que suena allá.
+ * El editor de una hope nueva o guardada. Escuchar usa el mismo reproductor que la biblioteca
+ * con los mismos ajustes, así lo que se oye aquí es lo que suena allá. [args] llega de la ruta
+ * restaurable del destino.
  */
-class EditorViewModel(
-    private val args: EditorArgs,
+@HiltViewModel(assistedFactory = EditorViewModel.Factory::class)
+class EditorViewModel @AssistedInject constructor(
+    @Assisted private val args: EditorArgs,
     private val hopes: HopeRepository,
     private val assets: AssetRepository,
-    private val player: MixPlayer,
+    private val player: HopePlayer,
     private val recorder: VoiceRecorder,
     private val inspector: MediaInspector,
-    private val headphonesConnected: () -> Boolean,
+    @param:HeadphonesConnected private val headphonesConnected: () -> Boolean,
     private val previews: LinkPreviews,
 ) : ViewModel() {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(args: EditorArgs): EditorViewModel
+    }
 
     private val _state = MutableStateFlow(EditorUiState())
     private var createdAt = 0L
@@ -134,15 +142,13 @@ class EditorViewModel(
     private var recordingJob: Job? = null
     private var pendingTake: File? = null
 
-    val state: StateFlow<EditorUiState> = combine(_state, player.state) { editor, playback ->
-        val mode = playback.editorMode()
-        editor.copy(playback = mode, positionMs = if (mode == EditorPlayback.Idle) 0 else playback.positionMs)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _state.value)
+    private val catalog = assets.observe(null).map { list -> list.map { PickableAsset(it, assets.fileOf(it)) } }
 
-    /** El catálogo para la hoja de elegir; nulo mientras se lee. */
-    val catalog: StateFlow<List<PickableAsset>?> = assets.observe(null)
-        .map { list -> list.map { PickableAsset(it, assets.fileOf(it)) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** Un solo estado para la pantalla: el borrador, lo que suena y el catálogo. */
+    val state: StateFlow<EditorUiState> = combine(_state, player.state, catalog) { editor, playback, pickable ->
+        val mode = playback.editorMode()
+        editor.copy(playback = mode, positionMs = if (mode == EditorPlayback.Idle) 0 else playback.positionMs, catalog = pickable)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _state.value)
 
     init {
         recorder.discardLeftovers()
@@ -436,21 +442,5 @@ class EditorViewModel(
         /** Paso de «Entra a los». */
         const val OFFSET_STEP_MS = 1_000L
         private const val MAX_OFFSET_MS = 10 * 60 * 1000L
-
-        fun factory(args: EditorArgs): ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = this[APPLICATION_KEY]!!.appContainer
-                EditorViewModel(
-                    args = args,
-                    hopes = container.hopeRepository,
-                    assets = container.assetRepository,
-                    player = container.mixPlayer,
-                    recorder = container.voiceRecorder,
-                    inspector = container.inspector,
-                    headphonesConnected = container.audioOutputs::headphonesConnected,
-                    previews = container.linkPreviews,
-                )
-            }
-        }
     }
 }

@@ -58,7 +58,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.tacuchi.hope.ui.common.AssetImage
 import dev.tacuchi.hope.ui.common.formatDuration
 import dev.tacuchi.hope.ui.common.openLink
@@ -76,7 +76,7 @@ fun LibraryScreen(
     onOpenAssets: () -> Unit,
     onNewHope: () -> Unit,
     onEditHope: (Long) -> Unit,
-    viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
+    viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current

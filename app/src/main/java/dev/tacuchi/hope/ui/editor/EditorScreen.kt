@@ -71,7 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.tacuchi.hope.R
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetOrigin
@@ -102,10 +102,11 @@ fun EditorScreen(
     onImport: (uri: Uri, origin: AssetOrigin, slot: EditorSlot) -> Unit,
     onClose: () -> Unit,
     onSaved: () -> Unit,
-    viewModel: EditorViewModel = viewModel(factory = EditorViewModel.factory(args)),
+    viewModel: EditorViewModel = hiltViewModel<EditorViewModel, EditorViewModel.Factory>(
+        creationCallback = { factory -> factory.create(args) },
+    ),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(imported) {
@@ -164,7 +165,7 @@ fun EditorScreen(
     if (pickingSlot != null) {
         AssetPickerSheet(
             slot = pickingSlot,
-            assets = catalog?.filter { it.asset.type == pickingSlot.assetType() },
+            assets = state.catalog?.filter { it.asset.type == pickingSlot.assetType() },
             onPick = { asset ->
                 picking = null
                 viewModel.choose(pickingSlot, asset)

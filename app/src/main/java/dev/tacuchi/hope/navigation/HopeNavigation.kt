@@ -29,6 +29,7 @@ import dev.tacuchi.hope.ui.library.LibraryScreen
 import dev.tacuchi.hope.ui.search.SearchScreen
 import dev.tacuchi.hope.ui.settings.LicensesScreen
 import dev.tacuchi.hope.ui.settings.SettingsScreen
+import dev.tacuchi.hope.ui.settings.SettingsViewModel
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -77,6 +78,7 @@ private fun EditorSlot.purpose() = when (this) {
 @Composable
 fun HopeNavigation(
     importViewModel: ImportViewModel,
+    settingsViewModel: SettingsViewModel,
     sharedLink: String? = null,
     onSharedLinkConsumed: () -> Unit = {},
 ) {
@@ -131,7 +133,16 @@ fun HopeNavigation(
                     onEditHope = { id -> backStack.add(EditorRoute(hopeId = id)) },
                 )
             }
-            entry<SettingsRoute> { SettingsScreen(dropUnlessResumed(block = goBack), dropUnlessResumed { backStack.add(LicensesRoute) }) }
+            entry<SettingsRoute> {
+                val appearance by settingsViewModel.appearance.collectAsStateWithLifecycle()
+                SettingsScreen(
+                    appearance = appearance,
+                    onThemeChange = settingsViewModel::setTheme,
+                    onPaletteChange = settingsViewModel::setPalette,
+                    onBack = dropUnlessResumed(block = goBack),
+                    onLicenses = dropUnlessResumed { backStack.add(LicensesRoute) },
+                )
+            }
             entry<LicensesRoute> { LicensesScreen(dropUnlessResumed(block = goBack)) }
             entry<SearchRoute> { SearchScreen(onBack = dropUnlessResumed(block = goBack)) }
             entry<AssetsRoute> {

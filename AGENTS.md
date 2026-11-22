@@ -22,6 +22,8 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 | kotlinx-serialization | 1.13.0 |
 | Room | 2.8.5 |
 | KSP | 2.3.14 |
+| Dagger Hilt (plugin, runtime y compilador) | 2.60.1 |
+| AndroidX Hilt (ViewModel para Compose) | 1.4.0 |
 | Media3 (Transformer, ExoPlayer, Common, Session) | 1.11.1 |
 | AboutLibraries (plugin Android y Compose M3) | 15.3.0 |
 | JUnit | 4.13.2 |
@@ -37,14 +39,21 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 
 - Un solo módulo `app`, paquete `dev.tacuchi.hope`.
 - Una sola actividad (`MainActivity`) con la API de pantalla de inicio y `enableEdgeToEdge()`. Todo se dibuja en Compose.
-- Navegación con Navigation 3: rutas `@Serializable` que implementan `NavKey` en `navigation/HopeNavigation.kt`, pila con `rememberNavBackStack`. Cada destino tiene sus ViewModels (`rememberViewModelStoreNavEntryDecorator`): se limpian al salir de la pila.
+- Navegación con Navigation 3: rutas `@Serializable` que implementan `NavKey` en `navigation/HopeNavigation.kt`, pila con `rememberNavBackStack`. Cada destino tiene sus ViewModels (`rememberViewModelStoreNavEntryDecorator`): se limpian al salir de la pila. Las rutas son parte de lo guardado: no se renombran.
 - Pantallas en `ui/<pantalla>/`. Cada una recibe callbacks de navegación, nunca la pila.
-- Estado: cuando una pantalla tiene datos, un `ViewModel` expone `StateFlow` y la pantalla lo lee con `collectAsStateWithLifecycle()`. La parte visual sin estado (`AssetsContent`) se prueba sola.
-- Inyección manual: `HopeApplication` crea un `AppContainer` con la base, los repositorios, los servicios de importación, el reproductor de mezcla y el grabador; cada ViewModel tiene su `Factory`. Con un solo módulo, Hilt sumaría plugin y anotaciones sin beneficio.
+- MVVM: cada pantalla con datos tiene un `ViewModel` que expone un único `StateFlow` de estado (`WhileSubscribed(5_000)` cuando combina flujos) y recibe las acciones de la persona. La pantalla lo lee con `collectAsStateWithLifecycle()` y nunca llama a repositorios ni servicios. Ningún ViewModel guarda `Context` ni hereda de `AndroidViewModel`. Compose se queda con lo que es de la interfaz: permisos, selectores del sistema, navegación y estado visual local. La parte visual sin estado (`LibraryContent`, `AssetsContent`) se prueba sola.
+- Búsqueda no tiene ViewModel: no tiene datos, solo abre los enlaces fijos de `Links.searchTargets`.
+- Inyección con Hilt. `HopeApplication` es `@HiltAndroidApp`; `MainActivity` y `PlaybackService` son `@AndroidEntryPoint`. Los módulos viven en `di/AppModule.kt`:
+  - `SingletonComponent`, una instancia por proceso: base Room, repositorios, apariencia, importación (staging, inspección, extracción), `MixPlayer` (también como `HopePlayer`), grabador, salidas de audio y vistas previas. Las carpetas de `filesDir` (`assets/`, `import-tmp/`, `recording-tmp/`), el nombre de la base y las preferencias (`appearance`) son los de la 0.1.0.
+  - `ViewModelComponent`: la preescucha de Assets (`AssetPreview`), nueva por cada ViewModel, que la libera en `onCleared`.
+- Ámbitos de los ViewModels:
+  - De la actividad (`by viewModels()` en `MainActivity`): `SettingsViewModel` (la actividad pinta el tema con su estado y se lo pasa a Ajustes) e `ImportViewModel` (la misma instancia recibe lo compartido y la navegación la muestra; con un dueño por destino la importación se perdería al navegar).
+  - De cada entrada de la pila (`hiltViewModel()` dentro del destino): `LibraryViewModel`, `AssetsViewModel` y `EditorViewModel`. El editor recibe `EditorArgs` de su ruta con inyección asistida (`@AssistedInject` y `hiltViewModel<EditorViewModel, EditorViewModel.Factory> { it.create(args) }`).
+- Las clases con E/S que los ViewModels usan se pueden reemplazar en las pruebas: `HopePlayer` (interfaz de `MixPlayer`), `AssetPreview` (interfaz de `AssetAudioPlayer`), `AppearanceStore`, y `MediaInspector` y `AudioExtractor`, que son clases abiertas.
 - Datos (`data/`): Room guarda el catálogo de assets y las hopes; los archivos viven en `filesDir/assets/`. El nombre visible se arma con el tipo y el número (o el momento del fotograma), no se guarda. «Nota de voz» es solo para OGG u Opus; el resto de los audios importados es «Audio». El esquema se exporta a `app/schemas/`.
 - Hopes: guardan qué assets usan (portada, fondo, voz) y sus ajustes (volumen por pista, recorte del fondo, desfase de la voz). La mezcla no se graba: ocurre al reproducir. Las referencias a assets son claves foráneas `RESTRICT`: un asset en uso no se borra, y Assets muestra qué hopes lo usan. Borrar una hope no borra sus assets.
 - Migraciones: automáticas (`AutoMigration`) mientras solo sumen tablas o columnas, nunca destructivas. Cada versión nueva se prueba abriendo una base de la anterior con assets (`HopeRepositoryTest`).
-- Mezcla (`playback/MixPlayer`): un solo reproductor para el editor y la biblioteca, en el contenedor. Es un `CompositionPlayer` de Media3 con dos secuencias que se mezclan en una sola salida de audio: el fondo recortado y la voz detrás de un silencio del largo de su desfase. Por salir juntas no se desfasan (con dos ExoPlayer la voz llegaba con 230 a 320 ms de atraso). El volumen de cada pista es un `GainProcessor` que se ajusta en vivo. La duración de una hope va del inicio del recorte al final de la última pista. `PlaybackService` expone la mezcla a través de una sesión de Media3 para que siga sonando en segundo plano. La notificación ofrece pausa, posición y Cerrar. Perder el foco de audio o desconectar los audífonos pausa la reproducción.
+- Mezcla (`playback/MixPlayer`): un solo reproductor para el editor, la biblioteca y el servicio, `@Singleton` en el grafo de Hilt. Es un `CompositionPlayer` de Media3 con dos secuencias que se mezclan en una sola salida de audio: el fondo recortado y la voz detrás de un silencio del largo de su desfase. Por salir juntas no se desfasan (con dos ExoPlayer la voz llegaba con 230 a 320 ms de atraso). El volumen de cada pista es un `GainProcessor` que se ajusta en vivo. La duración de una hope va del inicio del recorte al final de la última pista. `PlaybackService` recibe esa misma instancia por inyección de campo (disponible después de `super.onCreate()`) y expone la mezcla a través de una sesión de Media3 para que siga sonando en segundo plano. La notificación ofrece pausa, posición y Cerrar. Perder el foco de audio o desconectar los audífonos pausa la reproducción.
 - Grabación (`recording/`): `MediaRecorder` en AAC dentro de M4A a `filesDir/recording-tmp/`. «Listo» crea el asset «Grabación N»; descartar borra el temporal. El permiso de micrófono se pide al tocar Grabar. Con audífonos (cable, USB, Bluetooth A2DP o LE, según `AudioManager.getDevices`) el fondo suena mientras se graba; por el altavoz se graba en silencio, con un aviso.
 - Importación (`importing/`): todo lo recibido se copia primero a `filesDir/import-tmp/<sesión>/`, se inspecciona por su contenido (no por la extensión) y solo al confirmar pasa a ser asset. Cancelar o fallar borra la sesión.
 - Extracción: Media3 Transformer quita el video y deja M4A con AAC. Transformer es API inestable de Media3: su uso queda encerrado en `AudioExtractor` y `MixPlayer`, con `@OptIn(UnstableApi::class)`.
@@ -55,7 +64,7 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 
 ## Tema y diseño
 
-- Ajustes permite elegir Sistema, Claro u Oscuro y las paletas Hope, Lima, Coral y Violeta. En Android 12 o superior también ofrece Dinámico. La app abre con Sistema y Hope y guarda la selección en `SharedPreferences`. AboutLibraries genera las licencias durante la compilación.
+- Ajustes permite elegir Sistema, Claro u Oscuro y las paletas Hope, Lima, Coral y Violeta. En Android 12 o superior también ofrece Dinámico. La app abre con Sistema y Hope y guarda la selección en `SharedPreferences` (`PreferencesAppearanceStore`). AboutLibraries genera las licencias durante la compilación.
 - En la paleta Lima, `#b6f23c` es relleno (`primaryContainer`) en los dos temas. En claro nunca va como texto: el acento de texto es `primary` `#4c6700`.
 - Componentes, tipografía (Roboto) y formas de Material 3 por defecto. Lo único propio es la paleta.
 - Íconos: Material Symbols Outlined como vectores en `res/drawable/ic_*.xml`. Se usan con `painterResource`.
@@ -71,10 +80,12 @@ Las versiones viven en `gradle/libs.versions.toml`. Esta tabla las repite y se a
 ## Pruebas
 
 - Unitarias en `app/src/test`. Las de interfaz y las de Room (base en memoria) corren con Robolectric dentro de `testDebugUnitTest`, sin emulador.
+- Cada ViewModel tiene su `*ViewModelTest`: se construye a mano con dobles falsos en los límites de E/S (nunca mocks) y Room en memoria. Los dobles compartidos (`FakeHopePlayer`, `FakeAssetPreview`, `waitUntil`, `collectWhileTesting`) están en `testing/Fakes.kt`. Para activar los estados con `WhileSubscribed`, la prueba recoge el flujo mientras corre. `./gradlew testDebugUnitTest --tests '*ViewModelTest'` corre solo esas suites.
+- Las pruebas que abren `MainActivity` usan el grafo real: Robolectric crea la `HopeApplication` de Hilt del manifiesto. No hace falta `hilt-android-testing`.
 - Instrumentadas en `app/src/androidTest`: inspección de archivos reales, extracción con Media3 y la mezcla (`MixPlayerTest` mide el nivel de la salida mezclada: la voz entra a su desfase con ±100 ms y el fondo baja a su volumen). Necesitan emulador: `./gradlew connectedDebugAndroidTest`. No corren en CI.
 - Los archivos de prueba son sintéticos (tonos y colores). Se regeneran con `scripts/generar-medios-de-prueba.sh`; con una carpeta como argumento genera además los grandes (60 s y 11 min) para probar en el emulador, que no van al repo.
 - `ui/theme/ContrastTest.kt` mide el contraste WCAG de los pares de roles usados: texto 4,5:1, íconos y bordes 3:1.
-- `navigation/NavigationTest.kt` recorre los destinos, vuelve con Atrás y comprueba que la pila sobrevive a recrear la actividad.
+- `navigation/NavigationTest.kt` recorre los destinos, vuelve con Atrás y comprueba que la pila y la apariencia elegida sobreviven a recrear la actividad.
 - Cada prueba demuestra un comportamiento; no se prueban mapeos triviales.
 
 ## Comandos

@@ -1,17 +1,13 @@
 package dev.tacuchi.hope.ui.library
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import dev.tacuchi.hope.appContainer
+import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tacuchi.hope.data.AssetRepository
 import dev.tacuchi.hope.data.HopeRepository
 import dev.tacuchi.hope.data.HopeWithAssets
 import dev.tacuchi.hope.playback.MixPlayback
-import dev.tacuchi.hope.playback.MixPlayer
+import dev.tacuchi.hope.playback.HopePlayer
 import dev.tacuchi.hope.playback.libraryKey
 import dev.tacuchi.hope.playback.toMixSpec
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import javax.inject.Inject
 
 /** Una tarjeta de la biblioteca. */
 data class LibraryItem(val hope: HopeWithAssets, val coverFile: File?) {
@@ -35,10 +32,11 @@ data class LibraryUiState(
     val playingId: Long? = null,
 )
 
-class LibraryViewModel(
+@HiltViewModel
+class LibraryViewModel @Inject constructor(
     private val hopes: HopeRepository,
     private val assets: AssetRepository,
-    private val player: MixPlayer,
+    private val player: HopePlayer,
 ) : ViewModel() {
 
     val state: StateFlow<LibraryUiState> = combine(hopes.observe(), player.state) { list, playback ->
@@ -61,13 +59,4 @@ class LibraryViewModel(
 
     private fun MixPlayback.playingHopeId(): Long? =
         if (isPlaying) key?.removePrefix("hope-")?.toLongOrNull()?.takeIf { key == libraryKey(it) } else null
-
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val container = this[APPLICATION_KEY]!!.appContainer
-                LibraryViewModel(container.hopeRepository, container.assetRepository, container.mixPlayer)
-            }
-        }
-    }
 }

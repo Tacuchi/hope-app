@@ -13,9 +13,9 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import androidx.media3.session.MediaSessionService
+import dagger.hilt.android.AndroidEntryPoint
 import dev.tacuchi.hope.MainActivity
 import dev.tacuchi.hope.R
-import dev.tacuchi.hope.appContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,13 +23,18 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
+@AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
+    /** La misma mezcla que suena desde la UI. Hilt la inyecta en `super.onCreate()`. */
+    @Inject
+    lateinit var mix: MixPlayer
+
     private var session: MediaSession? = null
     private var attachedSource: Player? = null
     private val scope = CoroutineScope(Job() + Dispatchers.Main)
-    private val mix get() = appContainer.mixPlayer
 
     private val close = SessionCommand("dev.tacuchi.hope.CLOSE", Bundle.EMPTY)
     private val controls = object : MediaSession.Callback {

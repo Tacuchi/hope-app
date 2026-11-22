@@ -3,13 +3,9 @@ package dev.tacuchi.hope.ui.assets
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tacuchi.hope.R
-import dev.tacuchi.hope.appContainer
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetRepository
 import dev.tacuchi.hope.data.AssetUse
@@ -23,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 enum class AssetFilter(@StringRes val label: Int, @DrawableRes val icon: Int, val type: AssetType?) {
     All(R.string.assets_filter_all, R.drawable.ic_check, null),
@@ -44,10 +41,11 @@ data class AssetsUiState(
     val hopes: List<HopeChoice> = emptyList(),
 )
 
-class AssetsViewModel(
+@HiltViewModel
+class AssetsViewModel @Inject constructor(
     private val repository: AssetRepository,
     private val hopes: HopeRepository,
-    private val player: AssetAudioPlayer,
+    private val player: AssetPreview,
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(AssetFilter.All)
@@ -88,15 +86,5 @@ class AssetsViewModel(
 
     override fun onCleared() {
         player.release()
-    }
-
-    companion object {
-        val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer {
-                val application = this[APPLICATION_KEY]!!
-                val container = application.appContainer
-                AssetsViewModel(container.assetRepository, container.hopeRepository, AssetAudioPlayer(application))
-            }
-        }
     }
 }

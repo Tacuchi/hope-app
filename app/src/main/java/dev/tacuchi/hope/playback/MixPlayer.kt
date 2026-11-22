@@ -66,6 +66,28 @@ data class MixPlayback(
     val durationMs: Long = 0,
 )
 
+/**
+ * Lo que las pantallas piden al reproductor de hopes. Lo implementa [MixPlayer]; las pruebas de
+ * los ViewModels usan uno falso.
+ */
+interface HopePlayer {
+    val state: StateFlow<MixPlayback>
+
+    /** Toca una hope: si es la que suena la pausa; si estaba en pausa sigue; si es otra, empieza. */
+    fun toggle(key: String, mix: MixSpec)
+
+    /** Suena [mix] desde [startMs], o si es nulo, desde donde quedó si es la misma y desde el inicio si cambió. */
+    fun play(key: String, mix: MixSpec, startMs: Long? = null)
+
+    /** Cambia los ajustes de lo que suena para [key], sin cortar si solo cambió el volumen. */
+    fun update(key: String, mix: MixSpec)
+
+    fun pause()
+
+    /** Detiene si suena [key], por ejemplo al cerrar el editor o borrar la hope. */
+    fun stop(key: String)
+}
+
 /** Volumen que se puede cambiar mientras suena: el procesador lo lee muestra a muestra. */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
 private class LiveGain : GainProcessor.GainProvider {
@@ -96,7 +118,7 @@ class MixPlayer internal constructor(
     private val context: Context,
     private val outputMeter: AudioProcessor?,
     private val onPlaybackRequested: (() -> Unit)? = null,
-) {
+) : HopePlayer {
     constructor(context: Context) : this(context, null)
 
     private val focus = PlaybackFocus(context, ::pause)
@@ -108,7 +130,7 @@ class MixPlayer internal constructor(
     private val voiceGain = LiveGain()
 
     private val _state = MutableStateFlow(MixPlayback())
-    val state: StateFlow<MixPlayback> = _state.asStateFlow()
+    override val state: StateFlow<MixPlayback> = _state.asStateFlow()
 
     private val tick = object : Runnable {
         override fun run() {
@@ -142,13 +164,13 @@ class MixPlayer internal constructor(
     }
 
     /** Toca una hope: si es la que suena la pausa; si estaba en pausa sigue; si es otra, empieza. */
-    fun toggle(key: String, mix: MixSpec) {
+    override fun toggle(key: String, mix: MixSpec) {
         val current = _state.value
         if (current.key == key && current.isPlaying) pause() else play(key, mix)
     }
 
     /** Suena [mix] desde [startMs], o si no se da, desde donde quedó si es la misma y desde el inicio si cambió. */
-    fun play(key: String, mix: MixSpec, startMs: Long? = null) {
+    override fun play(key: String, mix: MixSpec, startMs: Long?) {
         val current = _state.value
         val same = current.key == key && spec?.sameTimeline(mix) == true
         val resumeAt = startMs ?: if (same) current.positionMs else 0L
@@ -167,7 +189,7 @@ class MixPlayer internal constructor(
      * acto; si cambió el recorte, el desfase o una pista, sigue desde el mismo punto con la mezcla
      * nueva.
      */
-    fun update(key: String, mix: MixSpec) {
+    override fun update(key: String, mix: MixSpec) {
         val current = _state.value
         if (current.key != key) return
         val old = spec ?: return
@@ -190,7 +212,7 @@ class MixPlayer internal constructor(
         if (spec != null && focus.acquire()) player?.play()
     }
 
-    fun pause() {
+    override fun pause() {
         focus.abandon()
         val current = player ?: return
         if (!current.playWhenReady) return
@@ -199,7 +221,7 @@ class MixPlayer internal constructor(
     }
 
     /** Detiene si suena [key], por ejemplo al cerrar el editor o borrar la hope. */
-    fun stop(key: String) {
+    override fun stop(key: String) {
         if (_state.value.key != key) return
         player?.stop()
         release()

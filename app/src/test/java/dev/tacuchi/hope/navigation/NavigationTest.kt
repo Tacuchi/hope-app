@@ -1,6 +1,8 @@
 package dev.tacuchi.hope.navigation
 
+import android.content.Context
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -10,18 +12,47 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.core.content.edit
+import androidx.core.view.WindowCompat
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tacuchi.hope.MainActivity
 import dev.tacuchi.hope.R
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
+import org.junit.rules.TestRule
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
+
+/** La prueba abre Hope con una apariencia ya guardada: Oscuro y Coral. */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class SavedDarkCoral
+
+private fun appearancePreferences() =
+    ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("appearance", Context.MODE_PRIVATE)
 
 @RunWith(AndroidJUnit4::class)
 class NavigationTest {
 
-    @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
+
+    /** Escribe la apariencia antes de que se abra la actividad, como una instalación con datos. */
+    private val savedAppearance: TestRule = object : TestWatcher() {
+        override fun starting(description: Description) {
+            if (description.getAnnotation(SavedDarkCoral::class.java) == null) return
+            appearancePreferences().edit(commit = true) {
+                putString("theme", "Dark")
+                putString("palette", "Coral")
+            }
+        }
+    }
+
+    @get:Rule
+    val rules: RuleChain = RuleChain.outerRule(savedAppearance).around(compose)
 
     private fun text(id: Int) = compose.activity.getString(id)
 
@@ -110,5 +141,41 @@ class NavigationTest {
         waitForEmptyAssets()
         pressBack()
         assertOnLibrary()
+    }
+
+    /** Si la actividad pinta las barras del sistema para un fondo claro: así se ve el tema aplicado. */
+    private fun lightBars(): Boolean {
+        var light = false
+        compose.activityRule.scenario.onActivity {
+            light = WindowCompat.getInsetsController(it.window, it.window.decorView).isAppearanceLightStatusBars
+        }
+        return light
+    }
+
+    @Test
+    @SavedDarkCoral
+    fun savedAppearanceAppliesAndAChangeSurvivesRecreation() {
+        assertOnLibrary()
+        assertEquals(false, lightBars())
+        compose.onNodeWithContentDescription(text(R.string.settings)).performClick()
+        compose.onNodeWithText(text(R.string.theme_dark)).assertIsSelected()
+        compose.onNodeWithText(text(R.string.palette_coral)).assertIsSelected()
+
+        compose.onNodeWithText(text(R.string.theme_light)).performClick()
+        compose.onNodeWithText(text(R.string.palette_violet)).performClick()
+        compose.waitForIdle()
+        assertEquals(true, lightBars())
+        pressBack()
+        assertOnLibrary()
+
+        compose.activityRule.scenario.recreate()
+
+        assertOnLibrary()
+        assertEquals(true, lightBars())
+        assertEquals("Light", appearancePreferences().getString("theme", null))
+        assertEquals("Violet", appearancePreferences().getString("palette", null))
+        compose.onNodeWithContentDescription(text(R.string.settings)).performClick()
+        compose.onNodeWithText(text(R.string.theme_light)).assertIsSelected()
+        compose.onNodeWithText(text(R.string.palette_violet)).assertIsSelected()
     }
 }

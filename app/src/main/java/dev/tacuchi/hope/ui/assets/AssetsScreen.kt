@@ -58,7 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.tacuchi.hope.R
 import dev.tacuchi.hope.data.Asset
 import dev.tacuchi.hope.data.AssetNameKind
@@ -81,7 +81,7 @@ fun AssetsScreen(
     onImport: (uri: Uri, origin: AssetOrigin) -> Unit,
     onUseInNewHope: (Asset) -> Unit,
     onOpenHope: (Long) -> Unit,
-    viewModel: AssetsViewModel = viewModel(factory = AssetsViewModel.Factory),
+    viewModel: AssetsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pickVisual = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->

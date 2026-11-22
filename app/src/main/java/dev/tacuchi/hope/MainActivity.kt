@@ -18,16 +18,23 @@ import androidx.core.content.IntentCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import dev.tacuchi.hope.importing.OriginResolver
 import dev.tacuchi.hope.links.Links
 import dev.tacuchi.hope.navigation.HopeNavigation
 import dev.tacuchi.hope.ui.importing.ImportPurpose
 import dev.tacuchi.hope.ui.importing.ImportViewModel
+import dev.tacuchi.hope.ui.settings.SettingsViewModel
 import dev.tacuchi.hope.ui.theme.HopeTheme
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val importViewModel: ImportViewModel by viewModels { ImportViewModel.Factory }
+    /** Una importación por actividad: la navegación y lo compartido usan la misma instancia. */
+    private val importViewModel: ImportViewModel by viewModels()
+
+    /** La apariencia: la actividad pinta con ella y Ajustes la cambia, desde la misma instancia. */
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     /** Un enlace recibido por Compartir, hasta que la navegación abre Nueva hope con él. */
     private var sharedLink by mutableStateOf<String?>(null)
@@ -39,7 +46,7 @@ class MainActivity : ComponentActivity() {
         // Al recrear la actividad el intent es el mismo: solo se importa la primera vez.
         if (savedInstanceState == null) importShared(intent)
         setContent {
-            val appearance by appContainer.appearanceRepository.appearance.collectAsStateWithLifecycle()
+            val appearance by settingsViewModel.appearance.collectAsStateWithLifecycle()
             HopeTheme(appearance) {
                 val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
                 SideEffect {
@@ -48,7 +55,12 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = lightBars
                     }
                 }
-                HopeNavigation(importViewModel, sharedLink, onSharedLinkConsumed = { sharedLink = null })
+                HopeNavigation(
+                    importViewModel = importViewModel,
+                    settingsViewModel = settingsViewModel,
+                    sharedLink = sharedLink,
+                    onSharedLinkConsumed = { sharedLink = null },
+                )
             }
         }
     }

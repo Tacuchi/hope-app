@@ -10,18 +10,30 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
+/** La preescucha de Assets, vista desde su ViewModel. */
+interface AssetPreview {
+    /** El asset que está sonando ahora; nulo si nada suena. */
+    val playingId: StateFlow<Long?>
+
+    /** Toca un audio: si es el que suena lo pausa, si estaba en pausa sigue, si es otro lo cambia. */
+    fun toggle(id: Long, file: File)
+
+    /** Detiene el audio si es el de [id], por ejemplo antes de borrarlo. */
+    fun stopIfCurrent(id: Long)
+
+    fun release()
+}
+
 /** Escucha un asset de audio desde Assets. ExoPlayer se crea al primer toque. */
-class AssetAudioPlayer(private val context: Context) {
+class AssetAudioPlayer(private val context: Context) : AssetPreview {
     private var player: ExoPlayer? = null
     private var currentId: Long? = null
 
     private val _playingId = MutableStateFlow<Long?>(null)
 
-    /** El asset que está sonando ahora; nulo si nada suena. */
-    val playingId: StateFlow<Long?> = _playingId.asStateFlow()
+    override val playingId: StateFlow<Long?> = _playingId.asStateFlow()
 
-    /** Toca un audio: si es el que suena lo pausa, si estaba en pausa sigue, si es otro lo cambia. */
-    fun toggle(id: Long, file: File) {
+    override fun toggle(id: Long, file: File) {
         val exo = player ?: ExoPlayer.Builder(context).build().also { created ->
             created.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -46,8 +58,7 @@ class AssetAudioPlayer(private val context: Context) {
         }
     }
 
-    /** Detiene el audio si es el de [id], por ejemplo antes de borrarlo. */
-    fun stopIfCurrent(id: Long) {
+    override fun stopIfCurrent(id: Long) {
         if (currentId != id) return
         player?.stop()
         player?.clearMediaItems()
@@ -55,7 +66,7 @@ class AssetAudioPlayer(private val context: Context) {
         _playingId.value = null
     }
 
-    fun release() {
+    override fun release() {
         player?.release()
         player = null
         currentId = null

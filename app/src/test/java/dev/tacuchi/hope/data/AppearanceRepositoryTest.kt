@@ -12,11 +12,11 @@ class AppearanceRepositoryTest {
     @Test
     fun newInstallationUsesSystemAndHopeThenRestoresSelection() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val repository = AppearanceRepository(context)
+        val repository = AppearanceRepository(PreferencesAppearanceStore(context))
         assertEquals(Appearance(ThemeMode.System, Palette.Hope), repository.appearance.value)
         val chosen = Appearance(ThemeMode.Dark, Palette.Coral)
         repository.save(chosen)
         assertEquals(chosen, repository.appearance.value)
-        assertEquals(chosen, AppearanceRepository(context).appearance.value)
+        assertEquals(chosen, AppearanceRepository(PreferencesAppearanceStore(context)).appearance.value)
     }
 }
