@@ -1,5 +1,6 @@
 package dev.tacuchi.hope.ui.assets
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import android.content.Context
+import dev.tacuchi.hope.domain.media.PreviewPlayback
 import dev.tacuchi.hope.domain.model.Asset
 import dev.tacuchi.hope.domain.model.AssetNameKind
 import dev.tacuchi.hope.domain.model.AssetOrigin
@@ -59,11 +61,12 @@ class AssetsScreenTest {
         assets: List<Asset>,
         uses: Map<Long, List<AssetUse>> = emptyMap(),
         hopes: List<HopeChoice> = emptyList(),
+        preview: PreviewPlayback = PreviewPlayback(),
     ) {
         compose.setContent {
             HopeTheme {
                 AssetsContent(
-                    state = AssetsUiState(assets = assets, uses = uses, hopes = hopes),
+                    state = AssetsUiState(assets = assets, uses = uses, hopes = hopes, preview = preview),
                     onBack = {},
                     onSelectFilter = {},
                     onTogglePlay = { toggled = it },
@@ -177,5 +180,23 @@ class AssetsScreenTest {
         show(listOf(audio))
         compose.onNodeWithContentDescription(text(R.string.assets_more, text(UiR.string.asset_name_audio_from_video, 1))).performClick()
         compose.onNodeWithText(text(R.string.assets_use_existing_hope)).assertIsNotEnabled()
+    }
+
+    /** En reposo cada audio muestra su botón de reproducir; mientras suena, pausar y su avance frente a la duración. */
+    @Test
+    fun eachAudioShowsAPlayButtonAndItsProgressWhilePlaying() {
+        show(listOf(audio, frame))
+        val name = text(UiR.string.asset_name_audio_from_video, 1)
+        compose.onNodeWithContentDescription(text(R.string.assets_play, name)).performClick()
+        assertEquals(audio, toggled)
+        compose.onAllNodesWithText("0:17 / 0:52").assertCountEquals(0)
+    }
+
+    @Test
+    fun aPlayingAudioShowsPauseAndHowFarItWent() {
+        show(listOf(audio, frame), preview = PreviewPlayback(audio.id, isPlaying = true, positionMs = 17_000, durationMs = 52_000))
+        val name = text(UiR.string.asset_name_audio_from_video, 1)
+        compose.onNodeWithContentDescription(text(R.string.assets_pause, name)).assertExists()
+        compose.onNodeWithText("0:17 / 0:52").assertExists()
     }
 }

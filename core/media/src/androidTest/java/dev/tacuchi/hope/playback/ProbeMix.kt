@@ -1,20 +1,24 @@
 package dev.tacuchi.hope.playback
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.OptIn
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.audio.AudioProcessor
-import androidx.media3.common.audio.GainProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.CompositionPlayer
-import androidx.media3.transformer.EditedMediaItem
-import androidx.media3.transformer.EditedMediaItemSequence
-import androidx.media3.transformer.Effects
+import dev.tacuchi.hope.domain.model.BackgroundEffects
+import dev.tacuchi.hope.domain.model.Dip
+import dev.tacuchi.hope.domain.model.DuckLevel
+import dev.tacuchi.hope.domain.model.Fades
+import dev.tacuchi.hope.domain.model.GainShape
+import dev.tacuchi.hope.domain.model.HopeEffects
+import dev.tacuchi.hope.domain.model.MixSpec
+import dev.tacuchi.hope.domain.model.RoomEffect
+import dev.tacuchi.hope.domain.model.RoomType
+import dev.tacuchi.hope.domain.model.SpeedLevel
+import dev.tacuchi.hope.domain.model.VoiceEffects
 import java.io.File
+import kotlin.math.roundToInt
 import kotlin.math.max
 import kotlin.math.roundToLong
 
@@ -65,74 +69,73 @@ data class ProbeMix(
 }
 
 /**
- * Lo que se arma para una reproducción: la composición y las piezas que la prueba ajusta o mide.
- * Cada pista lleva sus efectos en este orden: voz clara, sala, ganancia (volumen, fundidos y
- * bajada) y, con [captureTracks], una captura de la pista. La mezcla lleva su fundido global y la
- * captura de la hope. Cada captura de pista suma un búfer después de la ganancia: para medir la
- * demora del volumen en vivo se arma sin ellas, como quedaría en la app.
+ * Lo que se arma para una reproducción: la composición de la app ([MixComposition]) para la misma
+ * hope y las piezas que la prueba ajusta o mide. Con [captureTracks], cada pista lleva una captura
+ * después de su ganancia; la mezcla lleva siempre la captura de la hope. Cada captura de pista suma
+ * un búfer después de la ganancia: para medir la demora del volumen en vivo se arma sin ellas.
+ *
+ * Las ganancias esperadas se calculan aparte: la de cada pista (su volumen, sus fundidos y su
+ * bajada) y la de la hope ([mixGain]), que la app aplica sobre la mezcla antes de la captura.
  */
 @OptIn(UnstableApi::class)
 class ProbeRun(val mix: ProbeMix, private val captureTracks: Boolean = true) {
     val mixCapture = MixCapture()
     val backgroundCapture = MixCapture()
     val voiceCapture = MixCapture()
-    val backgroundGain: GainEnvelope? = mix.background?.let {
-        GainEnvelope(it.lengthInHopeUs / 1_000, it.fadeInMs, it.fadeOutMs, mix.backgroundDips()).apply { volume = it.volume }
-    }
-    val voiceGain: GainEnvelope? = mix.voice?.let {
-        GainEnvelope(it.lengthInHopeUs / 1_000, it.fadeInMs, it.fadeOutMs).apply { volume = it.volume }
-    }
-    val mixGain = GainEnvelope(mix.durationUs / 1_000, mix.fadeInMs, mix.fadeOutMs)
 
-    val composition: Composition = run {
-        val totalUs = mix.durationUs
-        val sequences = buildList {
-            val bg = mix.background
-            if (bg != null) {
-                val sequence = audioSequence().addItem(edited(bg, checkNotNull(backgroundGain), backgroundCapture))
-                if (totalUs > bg.lengthInHopeUs) sequence.addGap(totalUs - bg.lengthInHopeUs)
-                add(sequence.build())
-            }
-            val voice = mix.voice
-            if (voice != null) {
-                val offsetUs = mix.voiceOffsetMs * 1_000
-                val endUs = offsetUs + voice.lengthInHopeUs
-                val sequence = audioSequence()
-                if (offsetUs > 0) sequence.addGap(offsetUs)
-                sequence.addItem(edited(voice, checkNotNull(voiceGain), voiceCapture))
-                if (totalUs > endUs) sequence.addGap(totalUs - endUs)
-                add(sequence.build())
-            }
-        }
-        // El fundido de la hope va sobre la mezcla solo si hay uno. Ese procesador suma un búfer después de las
-        // ganancias de pista: con él, la demora del volumen en vivo pasó de 1,8-2,0 s a 1,8-2,5 s.
-        val mixProcessors = if (mix.fadeInMs > 0 || mix.fadeOutMs > 0) listOf(GainProcessor(mixGain), mixCapture) else listOf(mixCapture)
-        Composition.Builder(sequences)
-            .setEffects(Effects(mixProcessors, emptyList()))
-            .build()
-    }
+    /** El mismo [MixSpec] que armaría la app para esta hope. */
+    val spec: MixSpec = mix.toSpec()
 
-    private fun audioSequence() = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+    private val built = MixComposition(
+        spec,
+        MixTaps(
+            background = backgroundCapture.takeIf { captureTracks },
+            voice = voiceCapture.takeIf { captureTracks },
+            mix = listOf(mixCapture),
+        ),
+    )
 
-    private fun edited(track: ProbeTrack, gain: GainEnvelope, capture: MixCapture): EditedMediaItem {
-        val clipping = MediaItem.ClippingConfiguration.Builder()
-            .setStartPositionMs(track.startMs)
-            .apply { track.endMs?.let(::setEndPositionMs) }
-            .build()
-        val item = MediaItem.Builder().setUri(Uri.fromFile(track.file)).setClippingConfiguration(clipping).build()
-        val processors = buildList<AudioProcessor> {
-            if (track.clearVoice) add(ClearVoice())
-            track.room?.let { if (track.roomAmount > 0f) add(RoomReverb(it, track.roomAmount)) }
-            add(GainProcessor(gain))
-            if (captureTracks) add(capture)
-        }
-        return EditedMediaItem.Builder(item)
-            .setRemoveVideo(true)
-            .setDurationUs(track.fileLengthMs * 1_000)
-            .apply { if (track.speed != 1f) setSpeed(ConstantSpeed(track.speed)) }
-            .setEffects(Effects(processors, emptyList()))
-            .build()
+    val backgroundGain: ExpectedGain? = mix.background?.let {
+        ExpectedGain(GainShape(it.lengthInHopeUs / 1_000, Fades(it.fadeInMs, it.fadeOutMs), dips = mix.backgroundDips()), built.backgroundGain)
     }
+    val voiceGain: ExpectedGain? = mix.voice?.let {
+        ExpectedGain(GainShape(it.lengthInHopeUs / 1_000, Fades(it.fadeInMs, it.fadeOutMs)), built.voiceGain)
+    }
+    val mixGain = ExpectedGain(GainShape(mix.durationUs / 1_000, Fades(mix.fadeInMs, mix.fadeOutMs)), null)
+
+    val composition: Composition = built.composition
+}
+
+/** La hope de prueba como la guarda la app. */
+private fun ProbeMix.toSpec(): MixSpec {
+    fun percent(value: Float) = (value * 100).roundToInt()
+    fun room(track: ProbeTrack) = RoomEffect(track.room ?: RoomType.None, percent(track.roomAmount))
+    val bg = background
+    val vo = voice
+    return MixSpec(
+        background = bg?.file,
+        backgroundLengthMs = bg?.fileLengthMs,
+        backgroundVolume = bg?.let { percent(it.volume) } ?: 100,
+        trimStartMs = bg?.startMs ?: 0,
+        trimEndMs = bg?.endMs,
+        voice = vo?.file,
+        voiceLengthMs = vo?.fileLengthMs,
+        voiceVolume = vo?.let { percent(it.volume) } ?: 100,
+        voiceOffsetMs = voiceOffsetMs,
+        voiceTrimStartMs = vo?.startMs ?: 0,
+        voiceTrimEndMs = vo?.endMs,
+        backgroundEffects = BackgroundEffects(
+            fades = Fades(bg?.fadeInMs ?: 0, bg?.fadeOutMs ?: 0),
+            room = bg?.let(::room) ?: RoomEffect(),
+            speed = SpeedLevel.entries.first { it.speed == (bg?.speed ?: 1f) },
+        ),
+        voiceEffects = VoiceEffects(
+            fades = Fades(vo?.fadeInMs ?: 0, vo?.fadeOutMs ?: 0),
+            room = vo?.let(::room) ?: RoomEffect(),
+            clearVoice = vo?.clearVoice ?: false,
+        ),
+        hopeEffects = HopeEffects(Fades(fadeInMs, fadeOutMs), duck),
+    )
 }
 
 /** Un `CompositionPlayer` para la prueba. Todo se llama en el hilo principal. */

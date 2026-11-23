@@ -8,7 +8,23 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.tacuchi.hope.domain.model.Asset
+import dev.tacuchi.hope.domain.model.AssetNameKind
+import dev.tacuchi.hope.domain.model.AssetOrigin
+import dev.tacuchi.hope.domain.model.AssetType
+import dev.tacuchi.hope.domain.model.BackgroundEffects
+import dev.tacuchi.hope.domain.model.DuckLevel
+import dev.tacuchi.hope.domain.model.Fades
+import dev.tacuchi.hope.domain.model.Hope
+import dev.tacuchi.hope.domain.model.HopeEffects
+import dev.tacuchi.hope.domain.model.HopeWithAssets
 import dev.tacuchi.hope.domain.model.MixSpec
+import dev.tacuchi.hope.domain.model.RoomEffect
+import dev.tacuchi.hope.domain.model.RoomType
+import dev.tacuchi.hope.domain.model.SpeedLevel
+import dev.tacuchi.hope.domain.model.VoiceEffects
+import dev.tacuchi.hope.domain.model.libraryKey
+import dev.tacuchi.hope.domain.model.toMixSpec
 import dev.tacuchi.hope.importing.testMedia
 import dev.tacuchi.hope.playback.Tolerance.TONE
 import org.junit.After
@@ -271,6 +287,61 @@ class MixPlayerTest {
 
         assertEquals(0.5, after, 0.03)
     }
+
+    /**
+     * La misma hope con todos sus efectos suena igual en el editor y en la biblioteca: el editor
+     * arma su mezcla con los ajustes del borrador y la biblioteca con los de la hope guardada
+     * ([toMixSpec]). Se comparan las dos salidas en ventanas de 20 ms y la huella de los archivos
+     * originales antes y después.
+     */
+    @Test
+    fun theEditorAndTheLibraryPlayTheSameHopeWithAllItsEffects() {
+        val backgroundFile = testMedia("fondo-tramos.m4a", dir)
+        val voiceFile = testMedia("voz-tramos.m4a", dir)
+        val before = listOf(backgroundFile, voiceFile).map { it.sha256() }
+        fun audio(id: Long, file: File, lengthMs: Long) = Asset(
+            id = id, type = AssetType.Audio, nameKind = AssetNameKind.Audio, number = id.toInt(), frameMs = null,
+            origin = AssetOrigin.Files, createdAt = 0, durationMs = lengthMs, file = file, mimeType = "audio/mp4",
+        )
+        val hope = Hope(
+            id = 1, title = "Todo", coverAssetId = null, backgroundAssetId = 1, voiceAssetId = 2,
+            backgroundVolume = 60, voiceVolume = 90, trimStartMs = 3_000, trimEndMs = 7_000, voiceOffsetMs = 1_000, createdAt = 0,
+            voiceTrimStartMs = 2_000, voiceTrimEndMs = 5_000,
+            backgroundEffects = BackgroundEffects(Fades(500, 800), RoomEffect(RoomType.Hall, 30), SpeedLevel.Slow),
+            voiceEffects = VoiceEffects(Fades(300, 500), RoomEffect(RoomType.Room, 20), clearVoice = true),
+            hopeEffects = HopeEffects(Fades(400, 600), DuckLevel.Medium),
+        )
+        val library = HopeWithAssets(hope, null, audio(1, backgroundFile, 10_000), audio(2, voiceFile, 6_000)).toMixSpec()
+        // Lo que arma el editor con el mismo borrador.
+        val editor = MixSpec(
+            background = backgroundFile, backgroundLengthMs = 10_000, backgroundVolume = 60, trimStartMs = 3_000, trimEndMs = 7_000,
+            voice = voiceFile, voiceLengthMs = 6_000, voiceVolume = 90, voiceOffsetMs = 1_000, voiceTrimStartMs = 2_000, voiceTrimEndMs = 5_000,
+            backgroundEffects = hope.backgroundEffects, voiceEffects = hope.voiceEffects, hopeEffects = hope.hopeEffects,
+            presentation = library.presentation,
+        )
+        assertEquals(library, editor)
+
+        fun play(key: String, spec: MixSpec): Take {
+            val capture = MixCapture()
+            val player = onMain { MixPlayer(context, capture) }.also { players += it }
+            onMain { player.play(key, spec) }
+            playUntilDone(player, maxMs = 12_000)
+            return capture.first()
+        }
+        val fromEditor = play("editor", editor)
+        val fromLibrary = play(libraryKey(1), library)
+
+        // El fondo lento dura 4,44 s; la voz recortada entra a 1 s y termina a 4 s.
+        assertEquals(4_444L, library.durationMs)
+        val points = (50..4_400 step 50).map { it.toDouble() }
+        val worst = points.maxOf { abs(fromEditor.rms(it - 10, it + 10) - fromLibrary.rms(it - 10, it + 10)) }
+        Log.i(TAG, "Editor contra biblioteca con todos los efectos: diferencia máxima de nivel ${"%.4f".format(worst)} en ${points.size} ventanas de 20 ms")
+        assertTrue("Editor y biblioteca difieren en $worst", worst <= 0.03)
+        assertEquals(before, listOf(backgroundFile, voiceFile).map { it.sha256() })
+    }
+
+    private fun File.sha256(): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(readBytes()).joinToString("") { "%02x".format(it) }
 
     private companion object {
         const val TAG = "HopeMixTest"

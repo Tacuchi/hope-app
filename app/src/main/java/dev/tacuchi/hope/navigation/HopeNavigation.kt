@@ -23,6 +23,7 @@ import dev.tacuchi.hope.ui.editor.EditorArgs
 import dev.tacuchi.hope.ui.editor.EditorImport
 import dev.tacuchi.hope.ui.editor.EditorScreen
 import dev.tacuchi.hope.ui.editor.EditorSlot
+import dev.tacuchi.hope.ui.editor.EditorStep
 import dev.tacuchi.hope.ui.importing.ImportPurpose
 import dev.tacuchi.hope.ui.importing.ImportScreen
 import dev.tacuchi.hope.ui.importing.ImportState
@@ -49,13 +50,18 @@ data object SearchRoute : NavKey
 @Serializable
 data object AssetsRoute : NavKey
 
-/** El editor: una hope guardada ([hopeId]) o una nueva, con assets o un enlace que pueden venir puestos. */
+/**
+ * El editor: una hope guardada ([hopeId]) o una nueva, con assets o un enlace que pueden venir
+ * puestos. [openStep] es el nombre del paso en que abre (sin él, Revisar si es guardada y Portada
+ * si es nueva); se agregó con valor por defecto, así una pila guardada antes se sigue leyendo.
+ */
 @Serializable
 data class EditorRoute(
     val hopeId: Long? = null,
     val coverAssetId: Long? = null,
     val backgroundAssetId: Long? = null,
     val linkUrl: String? = null,
+    val openStep: String? = null,
 ) : NavKey
 
 /** Una importación en curso; la muestra el estado de [ImportViewModel], no la pila. */
@@ -153,12 +159,19 @@ fun HopeNavigation(
                     onBack = dropUnlessResumed(block = goBack),
                     onImport = { uri, origin -> importViewModel.start(uri, declaredMime = null, origin = origin) },
                     onUseInNewHope = { asset -> backStack.add(editorWith(listOf(asset))) },
-                    onOpenHope = { id -> backStack.add(EditorRoute(hopeId = id)) },
+                    // «Usar en una hope existente» abre el paso del asset: Fondo si es audio, Portada si es imagen.
+                    onOpenHope = { id, type ->
+                        val step = if (type == AssetType.Audio) EditorStep.Background else EditorStep.Cover
+                        backStack.add(EditorRoute(hopeId = id, openStep = step.name))
+                    },
                 )
             }
             entry<EditorRoute> { route ->
                 EditorScreen(
-                    args = EditorArgs(route.hopeId, route.coverAssetId, route.backgroundAssetId, route.linkUrl),
+                    args = EditorArgs(
+                        route.hopeId, route.coverAssetId, route.backgroundAssetId, route.linkUrl,
+                        route.openStep?.let { name -> EditorStep.entries.firstOrNull { it.name == name } },
+                    ),
                     imported = editorImport,
                     onImportedConsumed = { editorImport = null },
                     onImport = { uri, origin, slot ->

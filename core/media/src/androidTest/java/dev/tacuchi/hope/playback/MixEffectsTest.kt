@@ -3,6 +3,7 @@ package dev.tacuchi.hope.playback
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tacuchi.hope.playback.Tolerance.TONE
 import dev.tacuchi.hope.playback.Tolerance.TONE_RMS
+import dev.tacuchi.hope.domain.model.DuckLevel
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith

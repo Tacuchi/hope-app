@@ -14,14 +14,18 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import androidx.media3.session.MediaSessionService
 import dagger.hilt.android.AndroidEntryPoint
+import dev.tacuchi.hope.cover.CoverComposer
+import dev.tacuchi.hope.domain.model.MixPresentation
 import dev.tacuchi.hope.media.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
@@ -30,6 +34,10 @@ class PlaybackService : MediaSessionService() {
     /** La misma mezcla que suena desde la UI. Hilt la inyecta en `super.onCreate()`. */
     @Inject
     lateinit var mix: MixPlayer
+
+    /** Compone la portada con sus efectos para la notificación y la pantalla de bloqueo. */
+    @Inject
+    lateinit var covers: CoverComposer
 
     private var session: MediaSession? = null
     private var attachedSource: Player? = null
@@ -59,10 +67,13 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setForegroundServiceTimeoutMs(0)
         scope.launch {
-            mix.state.map { it.key to it.presentation }.distinctUntilChanged().collect {
+            mix.state.map { it.key to it.presentation }.distinctUntilChanged().collectLatest {
                 val current = mix.state.value
-                if (current.key == null) endSession()
-                else (session?.player as? SessionPlayer)?.show(current.presentation)
+                if (current.key == null) {
+                    endSession()
+                } else {
+                    showWithArtwork(current.presentation)
+                }
             }
         }
     }
@@ -75,6 +86,8 @@ class PlaybackService : MediaSessionService() {
                 mix.state.value.key?.let(mix::stop)
             }
             wrapper.show(mix.state.value.presentation)
+            val shown = mix.state.value.presentation
+            scope.launch { showWithArtwork(shown) }
             // La actividad de lanzamiento del paquete: el servicio no conoce la actividad de la app.
             val launcher = packageManager.getLaunchIntentForPackage(packageName)?.component
             val openApp = PendingIntent.getActivity(this, 0, Intent().setComponent(launcher),
@@ -93,6 +106,15 @@ class PlaybackService : MediaSessionService() {
             attachedSource = source
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /** Primero la portada original, enseguida; después la compuesta con sus efectos, que puede tardar. */
+    private suspend fun showWithArtwork(presentation: MixPresentation) {
+        (session?.player as? SessionPlayer)?.show(presentation)
+        val artwork = withContext(Dispatchers.IO) { covers.artwork(presentation.cover, presentation.coverEffects) }
+        if (artwork != presentation.cover && mix.state.value.presentation == presentation) {
+            (session?.player as? SessionPlayer)?.show(presentation, artwork)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = session

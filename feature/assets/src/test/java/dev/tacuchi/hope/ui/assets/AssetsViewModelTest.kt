@@ -6,7 +6,8 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tacuchi.hope.domain.media.AssetPreview
+import dev.tacuchi.hope.domain.testing.FakeAssetPreview
+import dev.tacuchi.hope.domain.testing.FakeHopePlayer
 import dev.tacuchi.hope.domain.model.Asset
 import dev.tacuchi.hope.domain.model.AssetNameKind
 import dev.tacuchi.hope.domain.model.AssetOrigin
@@ -41,27 +42,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import java.io.File
 
-/** Preescucha de Assets sin ExoPlayer. */
-private class FakeAssetPreview : AssetPreview {
-    override val playingId = MutableStateFlow<Long?>(null)
-    val toggledFiles = mutableListOf<File>()
-    var released = false
-
-    override fun toggle(id: Long, file: File) {
-        toggledFiles += file
-        playingId.value = if (playingId.value == id) null else id
-    }
-
-    override fun stopIfCurrent(id: Long) {
-        if (playingId.value == id) playingId.value = null
-    }
-
-    override fun release() {
-        released = true
-        playingId.value = null
-    }
-}
-
 @RunWith(AndroidJUnit4::class)
 class AssetsViewModelTest {
 
@@ -71,6 +51,7 @@ class AssetsViewModelTest {
     private lateinit var assets: FakeAssetRepository
     private lateinit var hopes: FakeHopeRepository
     private val preview = FakeAssetPreview()
+    private val player = FakeHopePlayer()
     private val collectors = mutableListOf<Job>()
     private var clock = 1_000L
 
@@ -90,7 +71,7 @@ class AssetsViewModelTest {
         ObserveAssetUsesUseCase(hopes),
         ObserveHopesUseCase(hopes),
         ObserveAssetPreviewUseCase(preview),
-        ToggleAssetPreviewUseCase(preview),
+        ToggleAssetPreviewUseCase(preview, player),
         StopAssetPreviewUseCase(preview),
         ReleaseAssetPreviewUseCase(preview),
         DeleteAssetUseCase(assets),
@@ -134,6 +115,27 @@ class AssetsViewModelTest {
         vm.selectFilter(AssetFilter.Audio)
         waitUntil { vm.state.value.assets == listOf(audio) }
         assertEquals(AssetFilter.Audio, vm.now.filter)
+    }
+
+    /** Mientras suena, la fila sabe qué audio es, cuánto avanzó y cuánto dura; y la mezcla que sonaba se pausa. */
+    @Test
+    fun theActiveRowShowsProgressAgainstDurationAndOnlyOneThingSounds() {
+        val audio = add(AssetNameKind.AudioFromVideo, durationMs = 48_000)
+        val vm = viewModel()
+        player.play("hope-1", dev.tacuchi.hope.domain.model.MixSpec())
+
+        vm.togglePlay(audio)
+        preview.advanceTo(17_000)
+
+        val now = vm.now.preview
+        assertEquals(audio.id, now.assetId)
+        assertEquals(17_000L to 48_000L, now.positionMs to now.durationMs)
+        assertEquals(false, player.state.value.isPlaying)
+
+        // Pausar deja el avance a la vista; tocar de nuevo sigue desde ahí.
+        vm.togglePlay(audio)
+        assertNull(vm.now.playingId)
+        assertEquals(17_000L, vm.now.preview.positionMs)
     }
 
     @Test

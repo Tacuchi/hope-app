@@ -19,4 +19,20 @@ class HopeDurationTest {
         assertEquals(12_000L, hopeDurationMs(null, 0, null, 10_000, 2_000))
         assertEquals(0L, hopeDurationMs(null, 0, null, null, 0))
     }
+
+    /** Escenario de la spec: un fondo recortado de 44 s más lento alarga la hope; el recorte no cambia. */
+    @Test
+    fun aSlowerBackgroundLengthensTheHope() {
+        assertEquals(48_889L, hopeDurationMs(72_000, 8_000, 52_000, 20_000, 3_000, backgroundSpeed = 0.9f))
+        assertEquals(55_000L, hopeDurationMs(72_000, 8_000, 52_000, 20_000, 3_000, backgroundSpeed = 0.8f))
+    }
+
+    @Test
+    fun theVoiceCountsOnlyItsTrimmedPart() {
+        // Voz de 41 s recortada de 1 a 27 s (26 s) que entra a los 3 s: termina a los 29 s.
+        assertEquals(29_000L, hopeDurationMs(null, 0, null, 41_000, 3_000, voiceTrimStartMs = 1_000, voiceTrimEndMs = 27_000))
+        // Cortes fuera del archivo se acotan a él.
+        assertEquals(41_000L, hopeDurationMs(null, 0, null, 41_000, 0, voiceTrimStartMs = -5, voiceTrimEndMs = 90_000))
+        assertEquals(0L, hopeDurationMs(null, 0, null, 41_000, 0, voiceTrimStartMs = 50_000))
+    }
 }

@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import dev.tacuchi.hope.domain.model.MixPresentation
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import java.io.File
 
 @OptIn(UnstableApi::class)
 internal class SessionPlayer(
@@ -22,9 +23,13 @@ internal class SessionPlayer(
 ) : ForwardingSimpleBasePlayer(source) {
     private var metadata = MediaMetadata.EMPTY
 
-    fun show(presentation: MixPresentation) {
+    /**
+     * Muestra el título de [presentation] y su portada: [artwork] es la imagen ya compuesta con
+     * los efectos (ver [dev.tacuchi.hope.cover.CoverComposer]); sin ella, la original.
+     */
+    fun show(presentation: MixPresentation, artwork: File? = presentation.cover) {
         metadata = MediaMetadata.Builder().setTitle(presentation.title.ifBlank { untitled })
-            .setArtworkUri(presentation.cover?.let(Uri::fromFile)).build()
+            .setArtworkUri(artwork?.let(Uri::fromFile)).build()
         invalidateState()
     }
 

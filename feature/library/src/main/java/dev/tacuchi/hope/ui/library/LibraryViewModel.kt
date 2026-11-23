@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dev.tacuchi.hope.domain.model.CoverEffects
 import java.io.File
 import javax.inject.Inject
 
@@ -24,6 +25,9 @@ data class LibraryItem(val hope: HopeWithAssets) {
     val durationMs: Long get() = hope.durationMs
     val linkUrl: String? get() = hope.hope.linkUrl
     val coverFile: File? get() = hope.cover?.file
+
+    /** Cómo se ve la portada: sin efectos es la original. */
+    val coverEffects: CoverEffects get() = hope.hope.coverEffects
 }
 
 data class LibraryUiState(

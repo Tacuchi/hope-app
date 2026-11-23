@@ -1,0 +1,418 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "105a71041c7d3ddeee12628c03b5c488",
+    "entities": [
+      {
+        "tableName": "assets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `nameKind` TEXT NOT NULL, `number` INTEGER, `frameMs` INTEGER, `origin` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `durationMs` INTEGER, `fileName` TEXT NOT NULL, `mimeType` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameKind",
+            "columnName": "nameKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "frameMs",
+            "columnName": "frameMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fileName",
+            "columnName": "fileName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_assets_type_createdAt",
+            "unique": false,
+            "columnNames": [
+              "type",
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_assets_type_createdAt` ON `${TABLE_NAME}` (`type`, `createdAt`)"
+          }
+        ]
+      },
+      {
+        "tableName": "hopes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `coverAssetId` INTEGER, `backgroundAssetId` INTEGER, `voiceAssetId` INTEGER, `backgroundVolume` INTEGER NOT NULL, `voiceVolume` INTEGER NOT NULL, `trimStartMs` INTEGER NOT NULL, `trimEndMs` INTEGER, `voiceOffsetMs` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `linkUrl` TEXT, `linkNetwork` TEXT, `linkTitle` TEXT, `linkThumbnailUrl` TEXT, `voiceTrimStartMs` INTEGER NOT NULL DEFAULT 0, `voiceTrimEndMs` INTEGER, `backgroundFadeInMs` INTEGER NOT NULL DEFAULT 0, `backgroundFadeOutMs` INTEGER NOT NULL DEFAULT 0, `voiceFadeInMs` INTEGER NOT NULL DEFAULT 0, `voiceFadeOutMs` INTEGER NOT NULL DEFAULT 0, `hopeFadeInMs` INTEGER NOT NULL DEFAULT 0, `hopeFadeOutMs` INTEGER NOT NULL DEFAULT 0, `backgroundRoom` TEXT NOT NULL DEFAULT 'None', `backgroundRoomAmount` INTEGER NOT NULL DEFAULT 30, `voiceRoom` TEXT NOT NULL DEFAULT 'None', `voiceRoomAmount` INTEGER NOT NULL DEFAULT 30, `backgroundSpeed` TEXT NOT NULL DEFAULT 'Normal', `clearVoice` INTEGER NOT NULL DEFAULT 0, `duck` TEXT, `coverFilter` TEXT NOT NULL DEFAULT 'None', `coverFilterAmount` INTEGER NOT NULL DEFAULT 70, `coverFrame` TEXT NOT NULL DEFAULT 'None', `coverTexture` TEXT NOT NULL DEFAULT 'None', `coverTextureAmount` INTEGER NOT NULL DEFAULT 30, `coverZoom` INTEGER NOT NULL DEFAULT 100, `coverOffsetX` INTEGER NOT NULL DEFAULT 0, `coverOffsetY` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`coverAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`backgroundAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`voiceAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "coverAssetId",
+            "columnName": "coverAssetId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "backgroundAssetId",
+            "columnName": "backgroundAssetId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "voiceAssetId",
+            "columnName": "voiceAssetId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "backgroundVolume",
+            "columnName": "backgroundVolume",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "voiceVolume",
+            "columnName": "voiceVolume",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trimStartMs",
+            "columnName": "trimStartMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trimEndMs",
+            "columnName": "trimEndMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "voiceOffsetMs",
+            "columnName": "voiceOffsetMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "linkUrl",
+            "columnName": "linkUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkNetwork",
+            "columnName": "linkNetwork",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkTitle",
+            "columnName": "linkTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkThumbnailUrl",
+            "columnName": "linkThumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "voiceTrimStartMs",
+            "columnName": "voiceTrimStartMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "voiceTrimEndMs",
+            "columnName": "voiceTrimEndMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "backgroundFadeInMs",
+            "columnName": "backgroundFadeInMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "backgroundFadeOutMs",
+            "columnName": "backgroundFadeOutMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "voiceFadeInMs",
+            "columnName": "voiceFadeInMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "voiceFadeOutMs",
+            "columnName": "voiceFadeOutMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "hopeFadeInMs",
+            "columnName": "hopeFadeInMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "hopeFadeOutMs",
+            "columnName": "hopeFadeOutMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "backgroundRoom",
+            "columnName": "backgroundRoom",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'None'"
+          },
+          {
+            "fieldPath": "backgroundRoomAmount",
+            "columnName": "backgroundRoomAmount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "30"
+          },
+          {
+            "fieldPath": "voiceRoom",
+            "columnName": "voiceRoom",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'None'"
+          },
+          {
+            "fieldPath": "voiceRoomAmount",
+            "columnName": "voiceRoomAmount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "30"
+          },
+          {
+            "fieldPath": "backgroundSpeed",
+            "columnName": "backgroundSpeed",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'Normal'"
+          },
+          {
+            "fieldPath": "clearVoice",
+            "columnName": "clearVoice",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "duck",
+            "columnName": "duck",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverFilter",
+            "columnName": "coverFilter",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'None'"
+          },
+          {
+            "fieldPath": "coverFilterAmount",
+            "columnName": "coverFilterAmount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "70"
+          },
+          {
+            "fieldPath": "coverFrame",
+            "columnName": "coverFrame",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'None'"
+          },
+          {
+            "fieldPath": "coverTexture",
+            "columnName": "coverTexture",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'None'"
+          },
+          {
+            "fieldPath": "coverTextureAmount",
+            "columnName": "coverTextureAmount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "30"
+          },
+          {
+            "fieldPath": "coverZoom",
+            "columnName": "coverZoom",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "100"
+          },
+          {
+            "fieldPath": "coverOffsetX",
+            "columnName": "coverOffsetX",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "coverOffsetY",
+            "columnName": "coverOffsetY",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hopes_coverAssetId",
+            "unique": false,
+            "columnNames": [
+              "coverAssetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hopes_coverAssetId` ON `${TABLE_NAME}` (`coverAssetId`)"
+          },
+          {
+            "name": "index_hopes_backgroundAssetId",
+            "unique": false,
+            "columnNames": [
+              "backgroundAssetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hopes_backgroundAssetId` ON `${TABLE_NAME}` (`backgroundAssetId`)"
+          },
+          {
+            "name": "index_hopes_voiceAssetId",
+            "unique": false,
+            "columnNames": [
+              "voiceAssetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hopes_voiceAssetId` ON `${TABLE_NAME}` (`voiceAssetId`)"
+          },
+          {
+            "name": "index_hopes_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hopes_createdAt` ON `${TABLE_NAME}` (`createdAt`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "coverAssetId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "backgroundAssetId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "voiceAssetId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '105a71041c7d3ddeee12628c03b5c488')"
+    ]
+  }
+}

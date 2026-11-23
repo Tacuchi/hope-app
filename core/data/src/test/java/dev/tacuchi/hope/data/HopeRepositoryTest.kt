@@ -13,6 +13,19 @@ import dev.tacuchi.hope.domain.model.NewAsset
 import dev.tacuchi.hope.domain.repository.AssetRepository
 import dev.tacuchi.hope.domain.repository.HopeRepository
 import dev.tacuchi.hope.domain.model.LinkNetwork
+import dev.tacuchi.hope.domain.model.BackgroundEffects
+import dev.tacuchi.hope.domain.model.CoverEffects
+import dev.tacuchi.hope.domain.model.CoverFilter
+import dev.tacuchi.hope.domain.model.CoverFrame
+import dev.tacuchi.hope.domain.model.CoverTexture
+import dev.tacuchi.hope.domain.model.DuckLevel
+import dev.tacuchi.hope.domain.model.Fades
+import dev.tacuchi.hope.domain.model.HopeEffects
+import dev.tacuchi.hope.domain.model.RoomEffect
+import dev.tacuchi.hope.domain.model.RoomType
+import dev.tacuchi.hope.domain.model.SpeedLevel
+import dev.tacuchi.hope.domain.model.VoiceEffects
+import dev.tacuchi.hope.domain.model.toMixSpec
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -296,5 +309,93 @@ class HopeRepositoryTest {
         val linked = migratedHopes.get(kept.hope.id)!!.hope
         assertEquals(LinkNetwork.YouTube, linked.linkNetwork)
         assertEquals("Me at the zoo", linked.linkTitle)
+    }
+
+    /**
+     * Una base de la versión 3 con una hope de dos pistas, fondo recortado y voz con desfase abre
+     * igual: la voz entera, sin fundidos, sin efectos y con su portada original. Sus assets y
+     * archivos siguen ahí, y su mezcla es la de antes.
+     */
+    @Test
+    fun migrationFromTheThirdVersionOpensOldHopesWholeAndWithoutEffects() = runBlocking {
+        database.close()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = context.getDatabasePath("migracion-3.db").apply { parentFile?.mkdirs(); delete() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            // Tablas tal como las exporta core/data/schemas/…/3.json.
+            old.execSQL(
+                "CREATE TABLE IF NOT EXISTS `assets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, " +
+                    "`nameKind` TEXT NOT NULL, `number` INTEGER, `frameMs` INTEGER, `origin` TEXT NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, `durationMs` INTEGER, `fileName` TEXT NOT NULL, `mimeType` TEXT NOT NULL)",
+            )
+            old.execSQL("CREATE INDEX IF NOT EXISTS `index_assets_type_createdAt` ON `assets` (`type`, `createdAt`)")
+            old.execSQL(
+                "CREATE TABLE IF NOT EXISTS `hopes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                    "`coverAssetId` INTEGER, `backgroundAssetId` INTEGER, `voiceAssetId` INTEGER, `backgroundVolume` INTEGER NOT NULL, " +
+                    "`voiceVolume` INTEGER NOT NULL, `trimStartMs` INTEGER NOT NULL, `trimEndMs` INTEGER, `voiceOffsetMs` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, `linkUrl` TEXT, `linkNetwork` TEXT, `linkTitle` TEXT, `linkThumbnailUrl` TEXT, " +
+                    "FOREIGN KEY(`coverAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , " +
+                    "FOREIGN KEY(`backgroundAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , " +
+                    "FOREIGN KEY(`voiceAssetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+            )
+            listOf("coverAssetId", "backgroundAssetId", "voiceAssetId", "createdAt").forEach { column ->
+                old.execSQL("CREATE INDEX IF NOT EXISTS `index_hopes_$column` ON `hopes` (`$column`)")
+            }
+            old.execSQL(
+                "INSERT INTO assets (type, nameKind, number, frameMs, origin, createdAt, durationMs, fileName, mimeType) " +
+                    "VALUES ('Audio', 'AudioFromVideo', 1, NULL, 'TikTok', 10, 52000, 'a.m4a', 'audio/mp4')",
+            )
+            old.execSQL(
+                "INSERT INTO assets (type, nameKind, number, frameMs, origin, createdAt, durationMs, fileName, mimeType) " +
+                    "VALUES ('Audio', 'Recording', 1, NULL, 'Recording', 15, 41000, 'v.m4a', 'audio/mp4')",
+            )
+            old.execSQL(
+                "INSERT INTO assets (type, nameKind, number, frameMs, origin, createdAt, durationMs, fileName, mimeType) " +
+                    "VALUES ('Image', 'Frame', NULL, 14000, 'TikTok', 20, NULL, 'f.jpg', 'image/jpeg')",
+            )
+            old.execSQL(
+                "INSERT INTO hopes (title, coverAssetId, backgroundAssetId, voiceAssetId, backgroundVolume, voiceVolume, " +
+                    "trimStartMs, trimEndMs, voiceOffsetMs, createdAt, linkUrl, linkNetwork, linkTitle, linkThumbnailUrl) " +
+                    "VALUES ('Antes de entrar', 3, 1, 2, 30, 90, 4000, 48000, 1500, 30, 'https://youtu.be/jNQXAC9IVRw', " +
+                    "'YouTube', 'Me at the zoo', NULL)",
+            )
+            old.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+            old.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '314b3b032060da7ef4d990f03ba68132')")
+            old.version = 3
+        }
+
+        database = HopeDatabase.create(context, "migracion-3.db")
+        val migratedHopes = RoomHopeRepository(database, assetsDir)
+
+        val kept = migratedHopes.observe().first().single()
+        val hope = kept.hope
+        assertEquals("Antes de entrar", hope.title)
+        assertEquals(listOf("f.jpg", "a.m4a", "v.m4a"), listOf(kept.cover, kept.background, kept.voice).map { it?.file?.name })
+        assertEquals(listOf(30, 90), listOf(hope.backgroundVolume, hope.voiceVolume))
+        assertEquals(Triple(4_000L, 48_000L, 1_500L), Triple(hope.trimStartMs, hope.trimEndMs, hope.voiceOffsetMs))
+        assertEquals(LinkNetwork.YouTube, hope.linkNetwork)
+        // La voz entera y nada de efectos: suena y se ve como antes.
+        assertEquals(0L to null, hope.voiceTrimStartMs to hope.voiceTrimEndMs)
+        assertEquals(BackgroundEffects(), hope.backgroundEffects)
+        assertEquals(VoiceEffects(), hope.voiceEffects)
+        assertEquals(HopeEffects(), hope.hopeEffects)
+        assertTrue(hope.coverEffects.isEmpty)
+        // Fondo de 44 s; la voz entra a 1,5 s y dura 41 s: termina a los 42,5 s.
+        assertEquals(44_000L, kept.durationMs)
+        val mix = kept.toMixSpec()
+        assertEquals(41_000L, mix.voiceSpanMs)
+        assertTrue(mix.backgroundShape().isUnity && mix.voiceShape().isUnity)
+        assertTrue(mix.presentation.coverEffects.isEmpty)
+
+        // La hope migrada guarda y devuelve sus efectos nuevos.
+        val withEffects = hope.copy(
+            voiceTrimStartMs = 1_000, voiceTrimEndMs = 27_000,
+            backgroundEffects = BackgroundEffects(Fades(2_000, 4_000), RoomEffect(RoomType.Hall, 30), SpeedLevel.Slow),
+            voiceEffects = VoiceEffects(Fades(500, 1_000), RoomEffect(RoomType.Room, 20), clearVoice = true),
+            hopeEffects = HopeEffects(Fades(1_000, 3_000), DuckLevel.Medium),
+            coverEffects = CoverEffects(CoverFilter.Warm, 70, CoverFrame.Thin, CoverTexture.Grain, 30, 120, 0, -25),
+        )
+        migratedHopes.save(withEffects)
+        assertEquals(withEffects, migratedHopes.get(hope.id)!!.hope)
     }
 }

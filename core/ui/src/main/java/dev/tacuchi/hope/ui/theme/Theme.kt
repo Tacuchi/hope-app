@@ -108,5 +108,5 @@ fun HopeTheme(appearance: Appearance = Appearance(), content: @Composable () -> 
     } else {
         fixedScheme(if (appearance.palette == Palette.Dynamic) Palette.Hope else appearance.palette, dark)
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = HopeTypography, content = content)
 }

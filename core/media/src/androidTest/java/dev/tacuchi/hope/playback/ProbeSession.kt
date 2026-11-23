@@ -51,7 +51,11 @@ class ProbeSession {
      * Suena [mix] desde el inicio hasta el final y devuelve lo armado, con sus capturas (las de cada
      * pista solo con [captureTracks]). [script] corre mientras suena.
      */
-    fun play(mix: ProbeMix, captureTracks: Boolean = true, script: Playing.() -> Unit = {}): ProbeRun {
+    fun play(
+        mix: ProbeMix,
+        captureTracks: Boolean = true,
+        script: Playing.() -> Unit = {},
+    ): ProbeRun {
         val run = ProbeRun(mix, captureTracks)
         val player = onMain { ProbePlayer(context).also { it.start(run) } }
         players += player

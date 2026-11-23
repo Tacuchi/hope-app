@@ -8,12 +8,34 @@ import dev.tacuchi.hope.domain.model.Asset
 import dev.tacuchi.hope.domain.model.AssetNameKind
 import dev.tacuchi.hope.domain.model.AssetOrigin
 import dev.tacuchi.hope.domain.model.AssetType
+import dev.tacuchi.hope.domain.model.BackgroundEffects
+import dev.tacuchi.hope.domain.model.CoverEffects
+import dev.tacuchi.hope.domain.model.CoverFilter
+import dev.tacuchi.hope.domain.model.CoverFrame
+import dev.tacuchi.hope.domain.model.CoverTexture
+import dev.tacuchi.hope.domain.model.DuckLevel
+import dev.tacuchi.hope.domain.model.Fades
 import dev.tacuchi.hope.domain.model.Hope
+import dev.tacuchi.hope.domain.model.HopeEffects
+import dev.tacuchi.hope.domain.model.RoomEffect
+import dev.tacuchi.hope.domain.model.RoomType
+import dev.tacuchi.hope.domain.model.SpeedLevel
+import dev.tacuchi.hope.domain.model.VoiceEffects
+import dev.tacuchi.hope.domain.model.WaveState
+import dev.tacuchi.hope.domain.model.toMixSpec
 import dev.tacuchi.hope.domain.model.Link
 import dev.tacuchi.hope.domain.model.LinkNetwork
 import dev.tacuchi.hope.domain.model.LinkPreview
 import dev.tacuchi.hope.domain.model.NewAsset
+import dev.tacuchi.hope.domain.media.WaveformSource
+import dev.tacuchi.hope.domain.model.Waveform
 import dev.tacuchi.hope.domain.repository.LinkPreviewRepository
+import dev.tacuchi.hope.domain.testing.FakeAssetPreview
+import dev.tacuchi.hope.domain.usecase.LoadWaveformUseCase
+import dev.tacuchi.hope.domain.usecase.ObserveAssetPreviewUseCase
+import dev.tacuchi.hope.domain.usecase.ReleaseAssetPreviewUseCase
+import dev.tacuchi.hope.domain.usecase.StopAllAssetPreviewUseCase
+import dev.tacuchi.hope.domain.usecase.ToggleAssetPreviewUseCase
 import dev.tacuchi.hope.domain.testing.FakeAssetRepository
 import dev.tacuchi.hope.domain.testing.FakeHopePlayer
 import dev.tacuchi.hope.domain.testing.FakeHopeRepository
@@ -87,6 +109,17 @@ private class FakeAudioOutputs(var headphones: Boolean = false) : AudioOutputs {
     override fun headphonesConnected() = headphones
 }
 
+/** Ondas sin decodificar: una por asset, o un error para los ids de [failing]. Anota cada cálculo. */
+private class FakeWaveforms(val failing: MutableSet<Long> = mutableSetOf()) : WaveformSource {
+    val computed = mutableListOf<Long>()
+
+    override suspend fun waveform(asset: Asset): Waveform {
+        computed += asset.id
+        if (asset.id in failing) throw java.io.IOException("No se pudo leer")
+        return Waveform(FloatArray(Waveform.BINS) { (it % 10) / 10f }, asset.durationMs ?: 0)
+    }
+}
+
 /** La vista previa de YouTube sin red: la que fije la prueba, o ninguna como sin conexión. */
 private class FakeLinkPreviews(var preview: (Link) -> LinkPreview? = { null }) : LinkPreviewRepository {
     override suspend fun previewOf(link: Link): LinkPreview? = preview(link)
@@ -102,6 +135,8 @@ class EditorViewModelTest {
     private lateinit var hopes: FakeHopeRepository
     private lateinit var recordingDir: File
     private val player = FakeHopePlayer()
+    private val preview = FakeAssetPreview()
+    private val waveforms = FakeWaveforms()
     private val collectors = mutableListOf<Job>()
     private var clock = 1_000L
 
@@ -127,7 +162,9 @@ class EditorViewModelTest {
             args = args,
             observeAssets = ObserveAssetsUseCase(assets),
             observePlayback = ObservePlaybackUseCase(player),
+            observePreview = ObserveAssetPreviewUseCase(preview),
             discardRecordingLeftovers = DiscardRecordingLeftoversUseCase(recorder),
+            loadWaveform = LoadWaveformUseCase(waveforms),
             getHope = GetHopeUseCase(hopes),
             getAsset = GetAssetUseCase(assets),
             saveHope = SaveHopeUseCase(hopes),
@@ -137,6 +174,9 @@ class EditorViewModelTest {
             playMix = PlayMixUseCase(player),
             updateMix = UpdateMixUseCase(player),
             stopMix = StopMixUseCase(player),
+            togglePreview = ToggleAssetPreviewUseCase(preview, player),
+            stopPreview = StopAllAssetPreviewUseCase(preview),
+            releasePreview = ReleaseAssetPreviewUseCase(preview),
             checkBackgroundWhileRecording = CheckBackgroundWhileRecordingUseCase(FakeAudioOutputs(headphones)),
             startVoiceTake = StartRecordingUseCase(recorder),
             stopVoiceTake = StopRecordingUseCase(recorder),
@@ -239,7 +279,7 @@ class EditorViewModelTest {
         assertEquals(30, saved.hope.backgroundVolume)
         assertEquals(4_000L, saved.hope.trimStartMs)
         assertEquals(48_000L, saved.hope.trimEndMs)
-        assertEquals(2_000L, saved.hope.voiceOffsetMs)
+        assertEquals(2 * EditorViewModel.OFFSET_STEP_MS, saved.hope.voiceOffsetMs)
     }
 
     @Test
@@ -410,5 +450,279 @@ class EditorViewModelTest {
         vm.save()
         waitUntil { vm.state.value.saved }
         assertNull(savedHopes().single().hope.linkUrl)
+    }
+
+    /** Una hope que usa todos los campos y todos los efectos. */
+    private fun fullHope(background: Asset, voice: Asset, cover: Asset) = Hope(
+        title = "Antes de entrar", coverAssetId = cover.id, backgroundAssetId = background.id, voiceAssetId = voice.id,
+        backgroundVolume = 60, voiceVolume = 90, trimStartMs = 8_000, trimEndMs = 52_000, voiceOffsetMs = 3_000, createdAt = 0,
+        linkUrl = "https://youtu.be/jNQXAC9IVRw", linkNetwork = LinkNetwork.YouTube,
+        voiceTrimStartMs = 1_000, voiceTrimEndMs = 27_000,
+        backgroundEffects = BackgroundEffects(Fades(2_000, 4_000), RoomEffect(RoomType.Hall, 30), SpeedLevel.Slow),
+        voiceEffects = VoiceEffects(Fades(500, 1_000), RoomEffect(RoomType.Room, 20), clearVoice = true),
+        hopeEffects = HopeEffects(Fades(1_000, 3_000), DuckLevel.Medium),
+        coverEffects = CoverEffects(CoverFilter.Warm, 70, CoverFrame.Thin, CoverTexture.Grain, 30, 120, 0, -25),
+    )
+
+    /** Se avanza y se vuelve por los pasos sobre el mismo borrador: no se pierde nada. */
+    @Test
+    fun stepsGoForwardAndBackWithoutLosingAnything() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 72_000)
+        val vm = viewModel()
+        assertEquals(EditorStep.Cover, vm.now.step)
+        vm.setTitle("Antes de entrar")
+
+        vm.next()
+        assertEquals(EditorStep.Background, vm.now.step)
+        vm.choose(EditorSlot.Background, background)
+        vm.setTrim(8_000, 52_000)
+        // No se salta a un paso que todavía no se alcanzó.
+        vm.goTo(EditorStep.Review)
+        assertEquals(EditorStep.Background, vm.now.step)
+
+        vm.next()
+        vm.startRecording()
+        vm.stopRecording()
+        vm.finishRecording()
+        waitUntil { vm.state.value.recording == null }
+        vm.next()
+        assertEquals(EditorStep.Mix, vm.now.step)
+        vm.setBackgroundVolume(60)
+        vm.shiftVoiceOffset(EditorViewModel.OFFSET_STEP_MS)
+
+        assertTrue(vm.back())
+        assertTrue(vm.back())
+        assertEquals(EditorStep.Background, vm.now.step)
+        // Un paso ya alcanzado se toca para volver a él.
+        vm.goTo(EditorStep.Mix)
+        assertEquals(EditorStep.Mix, vm.now.step)
+        vm.goTo(EditorStep.Cover)
+        assertFalse(vm.back())
+
+        val draft = vm.now.draft
+        assertEquals("Antes de entrar", draft.title)
+        assertEquals(background, draft.background)
+        assertEquals(8_000L to 52_000L, draft.trimStartMs to draft.trimEndMs)
+        assertEquals(AssetNameKind.Recording, draft.voice?.nameKind)
+        assertEquals(60, draft.backgroundVolume)
+        assertEquals(EditorViewModel.OFFSET_STEP_MS, draft.voiceOffsetMs)
+    }
+
+    /** «Editar» abre Revisar con todos los ajustes; «Usar en una hope existente» abre el paso del asset. */
+    @Test
+    fun editingOpensTheReviewWithEverySettingAndAnAssetOpensItsStep() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 72_000)
+        val voice = add(AssetNameKind.Recording, durationMs = 41_000)
+        val cover = add(AssetNameKind.Frame)
+        val hope = fullHope(background, voice, cover)
+        val id = runBlocking { hopes.save(hope) }
+
+        val edit = viewModel(EditorArgs(hopeId = id))
+        assertEquals(EditorStep.Review, edit.now.step)
+        assertEquals(EditorStep.Review, edit.now.reached)
+        val draft = edit.now.draft
+        assertEquals(hope.backgroundEffects, draft.backgroundEffects)
+        assertEquals(hope.voiceEffects, draft.voiceEffects)
+        assertEquals(hope.hopeEffects, draft.hopeEffects)
+        assertEquals(hope.coverEffects, draft.coverEffects)
+        assertEquals(1_000L to 27_000L, draft.voiceTrimStartMs to draft.voiceTrimEndMs)
+
+        assertEquals(EditorStep.Background, viewModel(EditorArgs(hopeId = id, openStep = EditorStep.Background)).now.step)
+        assertEquals(EditorStep.Cover, viewModel(EditorArgs(hopeId = id, openStep = EditorStep.Cover)).now.step)
+    }
+
+    /** Lo compartido o elegido en Assets abre el primer paso con lo que trae puesto. */
+    @Test
+    fun aNewHopeOpensInTheFirstStepWithWhatItBrings() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val cover = add(AssetNameKind.Frame)
+        val vm = viewModel(EditorArgs(coverAssetId = cover.id, backgroundAssetId = background.id))
+        assertEquals(EditorStep.Cover, vm.now.step)
+        assertEquals(cover, vm.now.draft.cover)
+        assertEquals(background, vm.now.draft.background)
+    }
+
+    /** Escuchar un candidato no cambia el borrador; elegirlo sí, y deja de sonar. */
+    @Test
+    fun listeningToACandidateKeepsTheDraftAndChoosingChangesIt() {
+        val current = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val first = add(AssetNameKind.Audio, durationMs = 48_000)
+        val second = add(AssetNameKind.Audio, durationMs = 30_000)
+        val vm = viewModel(EditorArgs(backgroundAssetId = current.id))
+        vm.toggleListen()
+        assertTrue(player.state.value.isPlaying)
+
+        vm.togglePickerPreview(first)
+        assertEquals(first.id, vm.now.preview.playingId)
+        // Se oye una sola cosa: la mezcla del editor se detuvo.
+        assertFalse(player.state.value.isPlaying)
+        vm.togglePickerPreview(second)
+        assertEquals(second.id, vm.now.preview.playingId)
+        assertEquals(current, vm.now.draft.background)
+
+        vm.closePicker()
+        assertNull(vm.now.preview.assetId)
+        assertEquals(current, vm.now.draft.background)
+
+        vm.togglePickerPreview(first)
+        vm.choose(EditorSlot.Background, first)
+        assertEquals(first, vm.now.draft.background)
+        assertNull(vm.now.preview.assetId)
+    }
+
+    /** La onda se calcula una vez por audio: recortar o cambiar el volumen no la vuelve a pedir. */
+    @Test
+    fun theWaveIsComputedOncePerAudioAndRetriedAfterAnError() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val other = add(AssetNameKind.Audio, durationMs = 30_000)
+        val vm = viewModel(EditorArgs(backgroundAssetId = background.id))
+        waitUntil { vm.state.value.backgroundWave is WaveState.Ready }
+        vm.setTrim(4_000, 40_000)
+        vm.setBackgroundVolume(40)
+        vm.setTrim(5_000, 40_000)
+        waitUntil { vm.state.value.draft.trimStartMs == 5_000L }
+        assertEquals(listOf(background.id), waveforms.computed)
+
+        waveforms.failing += other.id
+        vm.choose(EditorSlot.Background, other)
+        waitUntil { vm.state.value.backgroundWave == WaveState.Failed }
+        waveforms.failing.clear()
+        vm.retryWaves()
+        waitUntil { vm.state.value.backgroundWave is WaveState.Ready }
+        assertEquals(listOf(background.id, other.id, other.id), waveforms.computed)
+    }
+
+    /** Los recortes se acotan al archivo y siempre dejan un tramo; el audio original no cambia. */
+    @Test
+    fun trimsStayInsideTheFileAndTheOriginalIsUntouched() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 10_000)
+        val voice = add(AssetNameKind.Recording, durationMs = 6_000)
+        val bytes = voice.file.readBytes()
+        val id = runBlocking {
+            hopes.save(Hope(title = "Respira", coverAssetId = null, backgroundAssetId = background.id, voiceAssetId = voice.id,
+                backgroundVolume = 100, voiceVolume = 100, trimStartMs = 0, trimEndMs = null, voiceOffsetMs = 0, createdAt = 0))
+        }
+        val vm = viewModel(EditorArgs(hopeId = id))
+
+        vm.setVoiceTrim(1_000, 5_000)
+        assertEquals(1_000L to 5_000L, vm.now.draft.voiceTrimStartMs to vm.now.draft.voiceTrimEndMs)
+        vm.setVoiceTrim(4_900, 4_900)
+        assertEquals(4_900L to 5_400L, vm.now.draft.voiceTrimStartMs to vm.now.draft.voiceTrimEndMs)
+        vm.setVoiceTrim(-500, 99_000)
+        assertEquals(0L to null, vm.now.draft.voiceTrimStartMs to vm.now.draft.voiceTrimEndMs)
+        vm.setVoiceTrim(1_000, 5_000)
+        vm.setTrim(9_800, 20_000)
+        assertEquals(9_500L to null, vm.now.draft.trimStartMs to vm.now.draft.trimEndMs)
+
+        vm.save()
+        waitUntil { vm.state.value.saved }
+        val saved = savedHopes().single().hope
+        assertEquals(1_000L to 5_000L, saved.voiceTrimStartMs to saved.voiceTrimEndMs)
+        assertTrue(bytes.contentEquals(voice.file.readBytes()))
+    }
+
+    /**
+     * Desde cada hoja se escucha su parte con los efectos que se prueban, antes de cerrarla.
+     * «Cancelar» deja el borrador como estaba; «Aceptar» se los pasa.
+     */
+    @Test
+    fun eachEffectsSheetIsHeardBeforeClosingAndOnlyAcceptChangesTheDraft() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val voice = add(AssetNameKind.Recording, durationMs = 10_000)
+        val cover = add(AssetNameKind.Frame)
+        val id = runBlocking {
+            hopes.save(Hope(title = "Respira", coverAssetId = cover.id, backgroundAssetId = background.id, voiceAssetId = voice.id,
+                backgroundVolume = 100, voiceVolume = 100, trimStartMs = 0, trimEndMs = null, voiceOffsetMs = 2_000, createdAt = 0))
+        }
+        val vm = viewModel(EditorArgs(hopeId = id))
+
+        vm.openEffects(EffectsPart.Background)
+        vm.editBackgroundEffects { it.copy(room = RoomEffect(RoomType.Hall, 30), speed = SpeedLevel.Slow) }
+        vm.toggleSheetListen()
+        val heard = player.toggled.last()
+        assertEquals("editor-background", heard.first)
+        assertEquals(RoomEffect(RoomType.Hall, 30), heard.second.backgroundEffects.room)
+        assertNull(heard.second.voice)
+        assertEquals(BackgroundEffects(), vm.now.draft.backgroundEffects)
+        vm.cancelEffects()
+        assertNull(vm.now.effects)
+        assertEquals(BackgroundEffects(), vm.now.draft.backgroundEffects)
+        assertTrue("editor-background" in player.stopped)
+
+        vm.openEffects(EffectsPart.Voice)
+        vm.editVoiceEffects { it.copy(clearVoice = true, fades = Fades(500, 1_000)) }
+        vm.toggleSheetListen()
+        assertEquals("editor-voice", player.toggled.last().first)
+        assertTrue(player.toggled.last().second.voiceEffects.clearVoice)
+        assertNull(player.toggled.last().second.background)
+        vm.acceptEffects()
+        assertEquals(VoiceEffects(Fades(500, 1_000), clearVoice = true), vm.now.draft.voiceEffects)
+
+        vm.openEffects(EffectsPart.Hope)
+        vm.editHopeEffects { it.copy(fades = Fades(1_000, 3_000), duck = DuckLevel.Much) }
+        vm.toggleSheetListen()
+        assertEquals("editor", player.toggled.last().first)
+        assertEquals(HopeEffects(Fades(1_000, 3_000), DuckLevel.Much), player.toggled.last().second.hopeEffects)
+        vm.acceptEffects()
+
+        vm.openEffects(EffectsPart.Cover)
+        vm.editCoverEffects { it.copy(filter = CoverFilter.Mono) }
+        assertTrue(vm.now.draft.coverEffects.isEmpty)
+        vm.acceptEffects()
+        assertEquals(CoverFilter.Mono, vm.now.draft.coverEffects.filter)
+
+        vm.save()
+        waitUntil { vm.state.value.saved }
+        val saved = savedHopes().single().hope
+        assertEquals(VoiceEffects(Fades(500, 1_000), clearVoice = true), saved.voiceEffects)
+        assertEquals(HopeEffects(Fades(1_000, 3_000), DuckLevel.Much), saved.hopeEffects)
+        assertEquals(CoverFilter.Mono, saved.coverEffects.filter)
+    }
+
+    /** Sin voz, el fondo no puede bajar bajo la voz: el control no se activa y no se guarda. */
+    @Test
+    fun theBackgroundCannotDuckWithoutAVoice() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val vm = viewModel(EditorArgs(backgroundAssetId = background.id))
+        vm.openEffects(EffectsPart.Hope)
+        vm.editHopeEffects { it.copy(duck = DuckLevel.Much) }
+        assertNull(vm.now.effects?.hope?.duck)
+    }
+
+    /** El borrador suena igual que la misma hope guardada y vuelta a leer, con todos sus efectos. */
+    @Test
+    fun theDraftSoundsLikeTheSavedAndReloadedHope() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 72_000)
+        val voice = add(AssetNameKind.Recording, durationMs = 41_000)
+        val cover = add(AssetNameKind.Frame)
+        val id = runBlocking { hopes.save(fullHope(background, voice, cover)) }
+        val vm = viewModel(EditorArgs(hopeId = id))
+
+        vm.toggleListen()
+        val editorMix = player.toggled.last().second
+        vm.save()
+        waitUntil { vm.state.value.saved }
+        val libraryMix = runBlocking { hopes.get(id)!! }.toMixSpec()
+
+        assertEquals(libraryMix, editorMix)
+        // El fondo lento alarga la hope: 44 s a 0,9× son 48,9 s.
+        assertEquals(48_889L, editorMix.durationMs)
+    }
+
+    /** Volver de una importación desde un paso pone lo importado una sola vez y deja el resto. */
+    @Test
+    fun anImportFromAStepKeepsTheRestOfTheDraft() {
+        val background = add(AssetNameKind.AudioFromVideo, durationMs = 52_000)
+        val voice = add(AssetNameKind.Recording, durationMs = 10_000)
+        val cover = add(AssetNameKind.Frame)
+        val id = runBlocking { hopes.save(fullHope(background, voice, cover)) }
+        val vm = viewModel(EditorArgs(hopeId = id, openStep = EditorStep.Cover))
+        val before = vm.now.draft
+        val imported = add(AssetNameKind.Image)
+
+        vm.applyImported(EditorSlot.Cover, listOf(imported))
+
+        assertEquals(before.copy(cover = imported), vm.now.draft)
+        assertEquals(EditorStep.Cover, vm.now.step)
     }
 }

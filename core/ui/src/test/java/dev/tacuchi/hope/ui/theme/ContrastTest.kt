@@ -41,6 +41,11 @@ class ContrastTest {
             "primary/surface" to (s.primary to s.surface),
             "onPrimaryContainer/primaryContainer" to (s.onPrimaryContainer to s.primaryContainer),
             "onSecondaryContainer/secondaryContainer" to (s.onSecondaryContainer to s.secondaryContainer),
+            // Editor por pasos: textos de paneles, botones principales, tiempos de las asas y avisos de la onda.
+            "onSurfaceVariant/surfaceContainerHigh" to (s.onSurfaceVariant to s.surfaceContainerHigh),
+            "onPrimary/primary" to (s.onPrimary to s.primary),
+            "error/surfaceContainerHigh" to (s.error to s.surfaceContainerHigh),
+            "inverseOnSurface/inverseSurface" to (s.inverseOnSurface to s.inverseSurface),
         )
         val graphics = listOf(
             "outline/surface" to (s.outline to s.surface),
@@ -49,6 +54,10 @@ class ContrastTest {
             "primary/surfaceContainerHigh" to (s.primary to s.surfaceContainerHigh),
             "primary/secondaryContainer" to (s.primary to s.secondaryContainer),
             "onSurfaceVariant/surfaceContainerHigh" to (s.onSurfaceVariant to s.surfaceContainerHigh),
+            // Los carriles de la mezcla: ondas y cabezal sobre su fondo; bordes de opciones en los paneles.
+            "primary/surfaceContainerHighest" to (s.primary to s.surfaceContainerHighest),
+            "onSurface/surfaceContainerHighest" to (s.onSurface to s.surfaceContainerHighest),
+            "outline/surfaceContainerHigh" to (s.outline to s.surfaceContainerHigh),
         )
         val failures = text.mapNotNull { (pair, colors) -> check(pair, colors, 4.5) } +
             graphics.mapNotNull { (pair, colors) -> check(pair, colors, 3.0) }

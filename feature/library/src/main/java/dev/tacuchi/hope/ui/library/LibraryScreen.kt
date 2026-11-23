@@ -58,7 +58,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import dev.tacuchi.hope.ui.common.AssetImage
+import dev.tacuchi.hope.ui.common.CoverImage
 import dev.tacuchi.hope.ui.common.formatDuration
 import dev.tacuchi.hope.ui.common.openLink
 import dev.tacuchi.hope.ui.R as UiR
@@ -238,7 +238,8 @@ private fun HopeCard(
                 .background(colors.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            item.coverFile?.let { AssetImage(it, Modifier.fillMaxSize()) }
+            // La portada con sus efectos, dibujada sobre la original sin cambiarla.
+            item.coverFile?.let { CoverImage(it, item.coverEffects, Modifier.fillMaxSize(), maxSidePx = 480) }
             if (playing) {
                 Box(
                     modifier = Modifier

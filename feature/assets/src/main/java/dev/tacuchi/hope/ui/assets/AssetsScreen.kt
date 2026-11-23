@@ -59,7 +59,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import dev.tacuchi.hope.domain.media.PreviewPlayback
 import dev.tacuchi.hope.domain.model.Asset
+import dev.tacuchi.hope.ui.common.PlayRingButton
+import dev.tacuchi.hope.ui.common.ProgressLine
+import dev.tacuchi.hope.ui.common.progressText
+import dev.tacuchi.hope.ui.theme.TimeStyle
 import dev.tacuchi.hope.domain.model.AssetNameKind
 import dev.tacuchi.hope.domain.model.AssetOrigin
 import dev.tacuchi.hope.domain.model.AssetUse
@@ -82,7 +87,8 @@ fun AssetsScreen(
     onBack: () -> Unit,
     onImport: (uri: Uri, origin: AssetOrigin) -> Unit,
     onUseInNewHope: (Asset) -> Unit,
-    onOpenHope: (Long) -> Unit,
+    /** Abre una hope guardada en el paso del asset que se le puso: el fondo si es audio, la portada si es imagen. */
+    onOpenHope: (hopeId: Long, type: AssetType) -> Unit,
     viewModel: AssetsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -99,7 +105,7 @@ fun AssetsScreen(
         onTogglePlay = viewModel::togglePlay,
         onDelete = viewModel::delete,
         onUseInNewHope = onUseInNewHope,
-        onUseInHope = { asset, hopeId -> viewModel.useInHope(asset, hopeId, onOpenHope) },
+        onUseInHope = { asset, hopeId -> viewModel.useInHope(asset, hopeId) { onOpenHope(it, asset.type) } },
         onImportVisual = {
             pickVisual.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
         },
@@ -157,7 +163,7 @@ fun AssetsContent(
                     val fabHasItsOwnColumn = sideSpace >= FabSideSpace
                     AssetList(
                         assets = assets,
-                        playingId = state.playingId,
+                        preview = state.preview,
                         uses = state.uses,
                         canUseInExisting = state.hopes.isNotEmpty(),
                         onTogglePlay = onTogglePlay,
@@ -245,7 +251,7 @@ fun AssetsContent(
 @Composable
 private fun AssetList(
     assets: List<Asset>,
-    playingId: Long?,
+    preview: PreviewPlayback,
     uses: Map<Long, List<AssetUse>>,
     canUseInExisting: Boolean,
     onTogglePlay: (Asset) -> Unit,
@@ -269,7 +275,8 @@ private fun AssetList(
         items(assets, key = { it.id }) { asset ->
             AssetRow(
                 asset = asset,
-                playing = asset.id == playingId,
+                playing = asset.id == preview.playingId,
+                progress = preview.takeIf { it.assetId == asset.id },
                 useCount = uses[asset.id]?.size ?: 0,
                 canUseInExisting = canUseInExisting,
                 onTogglePlay = { onTogglePlay(asset) },
@@ -361,6 +368,8 @@ private fun EmptyState(filtered: Boolean) {
 private fun AssetRow(
     asset: Asset,
     playing: Boolean,
+    /** El avance si este audio es el de la preescucha, sonando o en pausa. */
+    progress: PreviewPlayback?,
     useCount: Int,
     canUseInExisting: Boolean,
     onTogglePlay: () -> Unit,
@@ -381,12 +390,26 @@ private fun AssetRow(
         leadingContent = { AssetTile(asset, playing) },
         supportingContent = {
             Column {
-                Text(
-                    assetSubtitle(asset),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (progress != null) {
+                    // Mientras suena (o en pausa): cuánto avanzó y cuánto dura, con su barra.
+                    Text(
+                        progressText(progress.positionMs, progress.durationMs.takeIf { it > 0 } ?: asset.durationMs ?: 0),
+                        style = TimeStyle.small,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    ProgressLine(
+                        progress.positionMs,
+                        progress.durationMs.takeIf { it > 0 } ?: asset.durationMs ?: 0,
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                } else {
+                    Text(
+                        assetSubtitle(asset),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (useCount > 0) {
                     Text(
                         pluralStringResource(R.plurals.assets_in_use, useCount, useCount),
@@ -396,7 +419,20 @@ private fun AssetRow(
                 }
             }
         },
-        trailingContent = { AssetMenu(name, canUseInExisting, onDelete, onUseInNewHope, onUseInHope) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (asset.type == AssetType.Audio) {
+                    PlayRingButton(
+                        playing = playing,
+                        positionMs = progress?.positionMs ?: 0,
+                        durationMs = progress?.durationMs?.takeIf { it > 0 } ?: asset.durationMs ?: 0,
+                        contentDescription = stringResource(if (playing) R.string.assets_pause else R.string.assets_play, name),
+                        onClick = onTogglePlay,
+                    )
+                }
+                AssetMenu(name, canUseInExisting, onDelete, onUseInNewHope, onUseInHope)
+            }
+        },
     ) {
         Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -405,7 +441,6 @@ private fun AssetRow(
 @Composable
 private fun AssetTile(asset: Asset, playing: Boolean) {
     val icon = when {
-        playing -> UiR.drawable.ic_pause
         asset.nameKind == AssetNameKind.Recording -> UiR.drawable.ic_mic
         asset.type == AssetType.Audio -> UiR.drawable.ic_music_note
         else -> UiR.drawable.ic_image

@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tacuchi.hope.domain.media.PreviewPlayback
 import dev.tacuchi.hope.domain.model.Asset
 import dev.tacuchi.hope.domain.model.AssetType
 import dev.tacuchi.hope.domain.model.AssetUse
@@ -41,12 +42,16 @@ data class AssetsUiState(
     val filter: AssetFilter = AssetFilter.All,
     /** Nulo mientras se lee el catálogo por primera vez. */
     val assets: List<Asset>? = null,
-    val playingId: Long? = null,
+    /** Lo que suena en la preescucha: qué audio, cuánto avanzó y cuánto dura. */
+    val preview: PreviewPlayback = PreviewPlayback(),
     /** Las hopes que usan cada asset, por id de asset. */
     val uses: Map<Long, List<AssetUse>> = emptyMap(),
     /** Las hopes guardadas, de la más reciente a la más antigua. */
     val hopes: List<HopeChoice> = emptyList(),
-)
+) {
+    /** El audio que suena ahora; nulo si nada suena. */
+    val playingId: Long? get() = preview.playingId
+}
 
 @HiltViewModel
 class AssetsViewModel @Inject constructor(

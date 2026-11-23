@@ -20,6 +20,7 @@ import dev.tacuchi.hope.domain.media.HopePlayer
 import dev.tacuchi.hope.domain.media.ImportStaging
 import dev.tacuchi.hope.domain.media.MediaInspector
 import dev.tacuchi.hope.domain.media.VoiceRecorder
+import dev.tacuchi.hope.domain.media.WaveformSource
 import dev.tacuchi.hope.domain.repository.AppearanceRepository
 import dev.tacuchi.hope.domain.repository.AssetRepository
 import dev.tacuchi.hope.domain.repository.HopeRepository
@@ -28,11 +29,13 @@ import dev.tacuchi.hope.importing.AndroidMediaInspector
 import dev.tacuchi.hope.importing.ContentImportStaging
 import dev.tacuchi.hope.importing.RetrieverFrameGrabber
 import dev.tacuchi.hope.importing.TransformerAudioExtractor
+import dev.tacuchi.hope.cover.CoverComposer
 import dev.tacuchi.hope.playback.MixPlayer
 import dev.tacuchi.hope.preview.AssetAudioPlayer
 import dev.tacuchi.hope.recording.MediaRecorderCapture
 import dev.tacuchi.hope.recording.MediaVoiceRecorder
 import dev.tacuchi.hope.recording.SystemAudioOutputs
+import dev.tacuchi.hope.waves.DecodedWaveforms
 import java.io.File
 import javax.inject.Singleton
 
@@ -94,6 +97,16 @@ object AppModule {
     fun voiceRecorder(@ApplicationContext context: Context): VoiceRecorder =
         MediaVoiceRecorder(MediaRecorderCapture(context), File(context.filesDir, "recording-tmp"))
 
+    /** Ondas de los audios del catálogo, en la caché privada: se reusan entre aperturas. */
+    @Provides
+    @Singleton
+    fun waveforms(@ApplicationContext context: Context): WaveformSource = DecodedWaveforms(File(context.cacheDir, "waves"))
+
+    /** Portadas con efectos para la notificación, en la caché privada. */
+    @Provides
+    @Singleton
+    fun covers(@ApplicationContext context: Context) = CoverComposer(File(context.cacheDir, "covers"))
+
     @Provides
     @Singleton
     fun audioOutputs(@ApplicationContext context: Context): AudioOutputs = SystemAudioOutputs(context)
@@ -111,7 +124,10 @@ abstract class PlayerModule {
 @InstallIn(ViewModelComponent::class)
 object ViewModelModule {
 
-    /** Una preescucha por cada pantalla de Assets; la comparten sus casos de uso y su ViewModel la libera al salir. */
+    /**
+     * Una preescucha por pantalla (Assets o el editor); la comparten sus casos de uso y su
+     * ViewModel la libera al salir.
+     */
     @Provides
     @ViewModelScoped
     fun assetPreview(@ApplicationContext context: Context): AssetPreview = AssetAudioPlayer(context)

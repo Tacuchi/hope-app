@@ -27,6 +27,14 @@ data class Hope(
     val linkNetwork: LinkNetwork? = null,
     val linkTitle: String? = null,
     val linkThumbnailUrl: String? = null,
+    /** Recorte de la voz, dentro de su audio. [voiceTrimEndMs] nulo es hasta el final. */
+    val voiceTrimStartMs: Long = 0,
+    val voiceTrimEndMs: Long? = null,
+    /** Sin efectos, una hope suena y se ve como en la versión anterior. */
+    val backgroundEffects: BackgroundEffects = BackgroundEffects(),
+    val voiceEffects: VoiceEffects = VoiceEffects(),
+    val hopeEffects: HopeEffects = HopeEffects(),
+    val coverEffects: CoverEffects = CoverEffects(),
 )
 
 /** Una hope con sus assets resueltos, lista para mostrar o reproducir. */
@@ -43,12 +51,15 @@ data class HopeWithAssets(
             trimEndMs = hope.trimEndMs,
             voiceMs = voice?.durationMs,
             voiceOffsetMs = hope.voiceOffsetMs,
+            voiceTrimStartMs = hope.voiceTrimStartMs,
+            voiceTrimEndMs = hope.voiceTrimEndMs,
+            backgroundSpeed = hope.backgroundEffects.speed.speed,
         )
 }
 
 /**
- * Desde el inicio del recorte hasta que termina la última pista. El fondo dura lo que su
- * recorte; la voz, su desfase más su largo. Una pista ausente no cuenta.
+ * Desde el inicio de la hope hasta que termina la última pista. El fondo dura su recorte dividido
+ * por su velocidad; la voz, su desfase más su recorte. Una pista ausente no cuenta.
  */
 fun hopeDurationMs(
     backgroundMs: Long?,
@@ -56,11 +67,20 @@ fun hopeDurationMs(
     trimEndMs: Long?,
     voiceMs: Long?,
     voiceOffsetMs: Long,
+    voiceTrimStartMs: Long = 0,
+    voiceTrimEndMs: Long? = null,
+    backgroundSpeed: Float = 1f,
 ): Long {
-    val background = backgroundMs?.let { length ->
-        val end = (trimEndMs ?: length).coerceIn(0, length)
-        (end - trimStartMs.coerceIn(0, end)).coerceAtLeast(0)
-    } ?: 0L
-    val voice = voiceMs?.let { voiceOffsetMs.coerceAtLeast(0) + it } ?: 0L
+    val background = backgroundMs?.let { trimmedLengthMs(it, trimStartMs, trimEndMs).inHope(backgroundSpeed) } ?: 0L
+    val voice = voiceMs?.let { voiceOffsetMs.coerceAtLeast(0) + trimmedLengthMs(it, voiceTrimStartMs, voiceTrimEndMs) } ?: 0L
     return maxOf(background, voice)
 }
+
+/** Lo que dura un tramo de un audio de [lengthMs], con sus cortes acotados al archivo. */
+fun trimmedLengthMs(lengthMs: Long, startMs: Long, endMs: Long?): Long {
+    val end = (endMs ?: lengthMs).coerceIn(0, lengthMs)
+    return (end - startMs.coerceIn(0, end)).coerceAtLeast(0)
+}
+
+/** Lo que dura en la hope un tramo que suena a [speed]. */
+fun Long.inHope(speed: Float): Long = if (speed == 1f) this else Math.round(this / speed.toDouble())

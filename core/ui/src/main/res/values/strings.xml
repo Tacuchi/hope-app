@@ -29,4 +29,6 @@
     <string name="origin_files">Archivos</string>
     <string name="origin_shared">Compartido</string>
     <string name="origin_recording">Grabación</string>
+    <string name="audio_progress">%1$s / %2$s</string>
+    <string name="cover_with_effects">Con efectos</string>
 </resources>

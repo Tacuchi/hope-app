@@ -66,7 +66,10 @@ class SharedIntentTest {
             .putExtra(Intent.EXTRA_STREAM, sharedImage())
 
         ActivityScenario.launch<MainActivity>(intent).use {
-            compose.waitUntilExactlyOneExists(hasText(context.getString(EditorR.string.editor_change_cover)), timeoutMillis = 5_000)
+            // Abre el primer paso de Nueva hope con la portada puesta.
+            val firstStep = context.getString(EditorR.string.editor_step_progress, 1, 5, context.getString(EditorR.string.step_cover))
+            compose.waitUntilExactlyOneExists(hasText(firstStep), timeoutMillis = 5_000)
+            compose.waitUntilDoesNotExist(hasText(context.getString(EditorR.string.editor_cover_empty)), timeoutMillis = 5_000)
             compose.onNodeWithText(context.getString(EditorR.string.editor_title)).assertExists()
             assertEquals(1, importedFiles())
         }
