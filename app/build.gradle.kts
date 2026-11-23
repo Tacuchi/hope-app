@@ -34,8 +34,8 @@ android {
     namespace = "dev.tacuchi.hope"
     defaultConfig {
         applicationId = "dev.tacuchi.hope"
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -57,6 +57,8 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("upload")
+            // Tabla de símbolos de las bibliotecas nativas, para que Play muestre nombres de función en las trazas.
+            ndk.debugSymbolLevel = "SYMBOL_TABLE"
         }
     }
 
