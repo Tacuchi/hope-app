@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.tacuchi.hope.domain.model.MixSpec
 import dev.tacuchi.hope.importing.testMedia
+import dev.tacuchi.hope.playback.Tolerance.TONE
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -187,6 +188,88 @@ class MixPlayerTest {
         val resumed = onMain { player.state.value }
         assertTrue(resumed.isPlaying)
         assertTrue("Siguió en ${resumed.positionMs} ms", resumed.positionMs > paused.positionMs)
+    }
+
+    /**
+     * Referencia de la mezcla actual, para compararla con una hope migrada: fondo al 30 % recortado
+     * al tramo de 330 Hz (de 3 a 7 s del archivo) y la voz entera, que entra a los 1,5 s. Cada
+     * archivo cambia de tono a cada lado de los cortes, así se ve qué parte suena y en qué instante.
+     */
+    @Test
+    fun theReferenceMixKeepsItsTrimOffsetAndLevels() {
+        val capture = MixCapture()
+        val player = onMain { MixPlayer(context, capture) }.also { players += it }
+        val spec = MixSpec(
+            background = testMedia("fondo-tramos.m4a", dir), backgroundLengthMs = 10_000, backgroundVolume = 30,
+            trimStartMs = 3_000, trimEndMs = 7_000,
+            voice = testMedia("voz-tramos.m4a", dir), voiceLengthMs = 6_000, voiceVolume = 100, voiceOffsetMs = 1_500,
+        )
+        assertEquals(7_500L, spec.durationMs)
+        onMain { player.play("referencia", spec) }
+        playUntilDone(player, maxMs = 12_000)
+        val mix = capture.first()
+
+        // Fondo solo, antes de la voz: nivel, estabilidad en ventanas de 20 ms y que no se cuele otro tramo.
+        val plateau = (300..1_300 step 10).map { mix.toneAt(330.0, it.toDouble()) / TONE }
+        val background = plateau.average()
+        val jitter = kotlin.math.sqrt(plateau.sumOf { (it - background) * (it - background) } / plateau.size) / background
+        val bgLevel = mix.tone(330.0, 200.0, 3_800.0)
+        val leak = maxOf(mix.tone(220.0, 200.0, 3_800.0), mix.tone(440.0, 200.0, 3_800.0)) / bgLevel
+        val bgEnd = mix.toneEnd(330.0, bgLevel / 2, 3_000.0, 5_000.0)!!
+        // El tramo anterior al corte (220 Hz) que se cuela al empezar, por el relleno del AAC.
+        val bgEdge = mix.toneEnd(220.0, bgLevel / 2, 0.0, 100.0) ?: 0.0
+        // La voz: entra con su primer tramo, cambia de tono donde debe y suena hasta el final.
+        val voiceStart = mix.toneOnset(660.0, TONE / 2, 500.0, 2_500.0)!!
+        val voiceSecond = mix.toneOnset(880.0, TONE / 2, 3_000.0, 4_000.0)!!
+        val voiceThird = mix.toneOnset(990.0, TONE / 2, 6_000.0, 7_000.0)!!
+        val voiceEnd = mix.toneEnd(990.0, TONE / 2, 7_000.0, 8_000.0)!!
+        val voiceLevels = listOf(
+            mix.tone(660.0, 1_700.0, 3_300.0), mix.tone(880.0, 3_700.0, 6_300.0), mix.tone(990.0, 6_700.0, 7_400.0),
+        ).map { it / TONE }
+        Log.i(
+            TAG,
+            "Referencia: fondo al 30 % mide ${"%.4f".format(background)} (desvío en 20 ms ${"%.2f".format(jitter * 100)} %); " +
+                "tramos vecinos ${"%.1f".format(leak.db())} dB; el tramo anterior al corte suena hasta los ${"%.0f".format(bgEdge)} ms; " +
+                "el fondo termina a los ${"%.0f".format(bgEnd)} ms; " +
+                "la voz entra a los ${"%.0f".format(voiceStart)} ms, cambia a los ${"%.0f".format(voiceSecond)} y " +
+                "${"%.0f".format(voiceThird)} ms y suena hasta los ${"%.0f".format(voiceEnd)} ms " +
+                "(fin de la captura ${"%.0f".format(mix.endMs)} ms); niveles de la voz ${voiceLevels.joinToString { "%.4f".format(it) }}",
+        )
+
+        assertEquals(0.30, background, 0.03)
+        assertTrue("Se coló otro tramo del fondo: ${leak.db()} dB", leak.db() < -40)
+        assertEquals(4_000.0, bgEnd, 100.0)
+        assertEquals(1_500.0, voiceStart, 100.0)
+        assertEquals(3_500.0, voiceSecond, 100.0)
+        assertEquals(6_500.0, voiceThird, 100.0)
+        assertEquals(7_500.0, mix.endMs, 50.0)
+        assertTrue("La voz se cortó a los $voiceEnd ms", voiceEnd >= mix.endMs - 20)
+        voiceLevels.forEach { assertEquals(1.0, it, 0.05) }
+    }
+
+    /**
+     * Referencia del volumen en vivo de la mezcla actual: el fondo de 10 s baja de 100 % a 50 % a los
+     * 2 s de reproducción. Mide cuánto tarda en oírse, porque la mezcla procesa el audio por delante
+     * de lo que suena.
+     */
+    @Test
+    fun theLiveVolumeReference() {
+        val capture = MixCapture()
+        val player = onMain { MixPlayer(context, capture) }.also { players += it }
+        val spec = MixSpec(background = background, backgroundLengthMs = 10_000)
+        onMain { player.play("volumen", spec) }
+        val deadline = System.currentTimeMillis() + 8_000
+        while (System.currentTimeMillis() < deadline && onMain { player.state.value.positionMs } < 2_000) Thread.sleep(10)
+        val changedAt = onMain { player.state.value.positionMs }
+        onMain { player.update("volumen", spec.copy(backgroundVolume = 50)) }
+        while (System.currentTimeMillis() < deadline + 4_000 && onMain { player.state.value.positionMs } < 6_000) Thread.sleep(10)
+        onMain { player.pause() }
+        val mix = capture.first()
+        val heardAt = generateSequence(changedAt.toDouble()) { it + 1 }.first { mix.toneAt(220.0, it) / TONE < 0.75 }
+        val after = mix.tone(220.0, heardAt + 200, minOf(mix.endMs, 6_000.0)) / TONE
+        Log.i(TAG, "Volumen en vivo: cambiado con la reproducción en $changedAt ms, se oye desde los ${"%.0f".format(heardAt)} ms (demora ${"%.0f".format(heardAt - changedAt)} ms); después mide ${"%.4f".format(after)}")
+
+        assertEquals(0.5, after, 0.03)
     }
 
     private companion object {
